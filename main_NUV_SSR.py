@@ -88,10 +88,10 @@ import matplotlib.pyplot as plt
 
 ### suppose k = 1 ###
 # data in polar coordinates (radius, angle in radians)
-r_gt = torch.squeeze(gt_positions[:, :, 0]).numpy()
-theta_gt = torch.squeeze(gt_positions[:, :, 1]).numpy()
-r_pred = torch.squeeze(pred_positions[:, :, 0]).numpy()
-theta_pred = torch.squeeze(pred_positions[:, :, 1]).numpy()
+r_gt = torch.squeeze(gt_positions[:, :, 0]).cpu().numpy()
+theta_gt = torch.squeeze(gt_positions[:, :, 1]).cpu().numpy()
+r_pred = torch.squeeze(pred_positions[:, :, 0]).cpu().numpy()
+theta_pred = torch.squeeze(pred_positions[:, :, 1]).cpu().numpy()
 
 # Create a polar subplot
 fig, ax = plt.subplots(subplot_kw={'projection': 'polar'})
@@ -104,9 +104,6 @@ ax.plot(theta_gt, r_gt, '*', label='Pred')
 
 # Add a legend in the upper left corner of the plot
 ax.legend(loc='upper left')
-
-# Display the plot
-plt.show()
 
 # save figure
 fig.savefig('simulations/Vanilla_default_sample=10.png')

@@ -19,7 +19,7 @@ class DataGenerator:
     
     def ULA_array(self): # can be both (x,y) or (r,theta)
         ULA_gap = 0.5 * self.args.wave_length # ULA gap is half of wave length
-        ULA_array = torch.zeros((self.args.n, 2), dtype=torch.float32) # y coordinates/theta coordinates are all 0
+        ULA_array = torch.zeros((self.args.n, 2), dtype=torch.float32, device=self.device) # y coordinates/theta coordinates are all 0
         ULA_array[:, 0] = torch.arange(self.args.n) * ULA_gap # x coordinates/ r coordinates
 
         return ULA_array
@@ -112,10 +112,9 @@ class DataGenerator:
         r_right = self.args.position_gt_rright_bound
         theta_left = self.args.position_gt_thetaleft_bound
         theta_right = self.args.position_gt_thetaright_bound
-        r_resol = (r_right - r_left) / (self.args.m_r-1)
-        theta_resol = (theta_right - theta_left) / (self.args.m_theta-1)       
-        r_positions = torch.arange(r_left, r_right + r_resol, r_resol)
-        theta_positions = torch.arange(theta_left, theta_right + theta_resol, theta_resol)
+        # Generate a tensor from left_bound to right_bound with 'size' points
+        r_positions = torch.linspace(r_left, r_right, steps=self.args.m_r, dtype=torch.float32, device=self.device)
+        theta_positions = torch.linspace(theta_left, theta_right, steps=self.args.m_theta, dtype=torch.float32, device=self.device)
         # convert deg to rad
         theta_positions = theta_positions * math.pi / 180 
         # Create a meshgrid of all r, theta pairs

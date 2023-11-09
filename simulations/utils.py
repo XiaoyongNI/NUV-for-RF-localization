@@ -114,10 +114,10 @@ def batch_peak_finding_2D(u, k):
           k, number of output peaks
   output: indices of the first k highest peaks [batch_size, k, 2]
   """
+  device = u.device
   spectrum = torch.abs(u)
   # Pad the map with one element on each side with '-inf' values
-  padded_map = pad(spectrum, (1, 1, 1, 1), mode='constant', value=float('-inf'))
-  print(padded_map)
+  padded_map = pad(spectrum, (1, 1, 1, 1), mode='constant', value=float('-inf')).to(device)
   # centers and 8 neighbors
   center = padded_map[:, 1:-1, 1:-1]
   top = padded_map[:, :-2, 1:-1]
@@ -141,7 +141,7 @@ def batch_peak_finding_2D(u, k):
   )
 
   # Create a tensor to hold the peak values
-  peak_values = torch.where(peaks_mask, center, torch.full_like(center, float('-inf')))
+  peak_values = torch.where(peaks_mask, center, torch.full_like(center, float('-inf'), device=device))
 
   # Now you want to get the top k values across the entire batch
   # Since you want to preserve the batch dimension, you use flatten(start_dim=1)
@@ -154,7 +154,7 @@ def batch_peak_finding_2D(u, k):
   peak_indices_2D = (topk_flat_indices // peak_values.size(2), topk_flat_indices % peak_values.size(2))
 
   # Prepare the 2D indices for each batch
-  peak_batch_indices = torch.arange(0, spectrum.size(0)).view(-1, 1).expand(-1, k)
+  peak_batch_indices = torch.arange(0, spectrum.size(0), device=device).reshape(-1, 1).expand(-1, k)
 
   # Combine the batch indices with the 2D indices
   peak_indices = torch.stack((peak_batch_indices, peak_indices_2D[0], peak_indices_2D[1]), dim=2)
