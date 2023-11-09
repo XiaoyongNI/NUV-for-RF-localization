@@ -186,7 +186,7 @@ def batch_de_flatten(spectrum, m_r, m_theta):
 
 
  
-# Convert to DoA
+# Convert from indices to DoA
 def convert_to_doa(peak_indices, centers):
     """
     input: peak_indices, array of size [k]
@@ -197,7 +197,7 @@ def convert_to_doa(peak_indices, centers):
     doa.sort()
     return doa
    
-# batch version of Convert to DoA
+# batch version of Convert from indices to DoA
 def batch_convert_to_doa(peak_indices, m):
   """
   input: peak_indices, tensor of size [batch_size, k]
@@ -213,7 +213,7 @@ def batch_convert_to_doa(peak_indices, m):
   return doa
 
 
-# batch version of Convert to positions
+# batch version of Convert from indices to positions
 def batch_convert_to_positions(peak_indices, r_positions, theta_positions):
   """
   input: peak_indices, tensor of size [batch_size, k, 3], (sample_id, r, theta)
@@ -226,6 +226,22 @@ def batch_convert_to_positions(peak_indices, r_positions, theta_positions):
   pred_r = pred_r.unsqueeze(2)
   pred_theta = pred_theta.unsqueeze(2)
   positions = torch.cat((pred_r, pred_theta), dim=2)
+
+  return positions
+
+# batch version of Convert from polar to cartesian coordinates
+def batch_polar_to_cartesian(positions):
+  """
+  input: positions, tensor of size [batch_size, k, 2], (r, theta)
+  output: positions, tensor of size [batch_size, k, 2], (x, y)
+  """
+  pred_r = positions[:, :, 0]
+  pred_theta = positions[:, :, 1]
+  pred_x = pred_r * torch.cos(pred_theta)
+  pred_y = pred_r * torch.sin(pred_theta)
+  pred_x = pred_x.unsqueeze(2)
+  pred_y = pred_y.unsqueeze(2)
+  positions = torch.cat((pred_x, pred_y), dim=2)
 
   return positions
 

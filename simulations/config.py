@@ -12,7 +12,7 @@ def general_settings():
                         help='number of sources')
     parser.add_argument('--n', type=int, default=10, metavar='n',
                         help='number of ULA elements')
-    parser.add_argument('--m_r', type=int, default=101, metavar='m_r',
+    parser.add_argument('--m_r', type=int, default=11, metavar='m_r',
                         help='number of grids in r')
     parser.add_argument('--m_theta', type=int, default=31, metavar='m_theta',
                         help='number of grids in theta')
