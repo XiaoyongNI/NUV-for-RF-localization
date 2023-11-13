@@ -1,6 +1,6 @@
 import torch
 
-def NUV_SSR(args, A, y, r):
+def NUV_SSR(args, A, y, r, m):
    """
    n: number of elements in ULA
    m: total number of hypotheses
@@ -21,7 +21,6 @@ def NUV_SSR(args, A, y, r):
    """
    # Set up parameters
    A_H = A.conj().T
-   m = args.m_r*args.m_theta
    n = args.n
    l = args.l
    max_iterations = args.max_iterations

@@ -162,26 +162,28 @@ def batch_peak_finding_2D(u, k):
   return peak_indices
 
 # de-flatten, convert 1D spectrum back to 2D
-def de_flatten(spectrum, m_r, m_theta):  
+def de_flatten(spectrum, m_x1, m_x2):  
   """
+  Use polar coordinates as an example, cartesian coordinates are similar
   make sure the traversal order of (r, theta) is the same as dictionary matrix
   input: spectrum, tensor of size [m_r * m_theta]
           m_r, number of grids in r
           m_theta, number of grids in theta
   output: spectrum, tensor of size [m_r, m_theta]
   """
-  spectrum = spectrum.reshape(m_r, m_theta)
+  spectrum = spectrum.reshape(m_x1, m_x2)
   return spectrum
 
 # batch version of de-flatten
-def batch_de_flatten(spectrum, m_r, m_theta):
+def batch_de_flatten(spectrum, m_x1, m_x2):
   """
+  Use polar coordinates as an example, cartesian coordinates are similar
   input: spectrum, tensor of size [batch_size, m_r * m_theta]
           m_r, number of grids in r
           m_theta, number of grids in theta
   output: spectrum, tensor of size [batch_size, m_r, m_theta]
   """
-  spectrum = spectrum.reshape(-1, m_r, m_theta)
+  spectrum = spectrum.reshape(-1, m_x1, m_x2)
   return spectrum
 
 
@@ -213,19 +215,20 @@ def batch_convert_to_doa(peak_indices, m):
   return doa
 
 
-# batch version of Convert from indices to positions
-def batch_convert_to_positions(peak_indices, r_positions, theta_positions):
+# batch version of Convert from indices to 2D positions
+def batch_convert_to_positions(peak_indices, x1_positions, x2_positions):
   """
-  input: peak_indices, tensor of size [batch_size, k, 3], (sample_id, r, theta)
-          r_positions, tensor of size [m_r]
-          theta_positions, tensor of size [m_theta] 
+  since there was a transpose in the dictionary matrix, the order of x1 and x2 is reversed
+  input: peak_indices, tensor of size [batch_size, k, 3], (sample_id, x1, x2)
+          x1_positions, tensor of size [m_r or m_x]
+          theta_positions, tensor of size [m_theta or m_y] 
   output: positions, tensor of size [batch_size, k, 3]
   """
-  pred_r = r_positions[peak_indices[:, :, 1]]
-  pred_theta = theta_positions[peak_indices[:, :, 2]]
-  pred_r = pred_r.unsqueeze(2)
-  pred_theta = pred_theta.unsqueeze(2)
-  positions = torch.cat((pred_r, pred_theta), dim=2)
+  pred_x1 = x1_positions[peak_indices[:, :, 2]]
+  pred_x2 = x2_positions[peak_indices[:, :, 1]]
+  pred_x1 = pred_x1.unsqueeze(2)
+  pred_x2 = pred_x2.unsqueeze(2)
+  positions = torch.cat((pred_x1, pred_x2), dim=2)
 
   return positions
 

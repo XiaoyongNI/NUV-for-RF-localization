@@ -31,6 +31,8 @@ args.sample = 10
 samples_run = args.sample
 # searching the best performed tuning parameter r (std of observation noise)
 r_t = [1e-0]
+# total num of hypotheses
+m = args.m_r * args.m_theta
 
 #### Generate data ####
 generator = DataGenerator(args)
@@ -64,9 +66,9 @@ for r_tuning in r_t:
     
     # NUV-SSR 
     for i in range(samples_run):
-        x_pred[i], iterations[i] = NUV_SSR(args, A_dic, y_mean[i], r_tuning)   
+        x_pred[i], iterations[i] = NUV_SSR(args, A_dic, y_mean[i], r_tuning, m)   
         print ('iterations = {}'.format(iterations[i]))
-    print('average iterations = {}'.format(torch.mean(iterations)))
+    print('average iterations = {}'.format(torch.mean(iterations.float())))
     
     # de-flatten x_pred [sample, m_r*m_theta] -> [sample, m_r, m_theta]
     x_pred_2D = utils.batch_de_flatten(x_pred, args.m_r, args.m_theta)
@@ -107,10 +109,10 @@ import numpy as np
 # data in polar coordinates (radius, angle in radians)
 torch.save([gt_positions, pred_positions], 'simulations/positions.pt')
 [gt_positions, pred_positions] = torch.load('simulations/positions.pt', map_location=device)
-r_gt = torch.squeeze(gt_positions[:, :, 0]).cpu().numpy()
-theta_gt = torch.squeeze(gt_positions[:, :, 1]).cpu().numpy()
-r_pred = torch.squeeze(pred_positions[:, :, 0]).cpu().numpy()
-theta_pred = torch.squeeze(pred_positions[:, :, 1]).cpu().numpy()
+r_gt = torch.squeeze(gt_positions[:, :, 0],1).cpu().numpy()
+theta_gt = torch.squeeze(gt_positions[:, :, 1],1).cpu().numpy()
+r_pred = torch.squeeze(pred_positions[:, :, 0],1).cpu().numpy()
+theta_pred = torch.squeeze(pred_positions[:, :, 1],1).cpu().numpy()
 
 # # Create a polar subplot
 fig, ax = plt.subplots(subplot_kw={'projection': 'polar'})
