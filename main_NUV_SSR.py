@@ -27,7 +27,7 @@ else:
     device = torch.device('cpu')
     print("Using CPU")
 # number of samples
-args.sample = 2
+args.sample = 10
 samples_run = args.sample
 # searching the best performed tuning parameter r (std of observation noise)
 r_t = [1e-0]
@@ -48,15 +48,26 @@ y_mean = y_train.mean(dim=1) # generate y_mean by averaging l snapshots for each
 start = time.time()
 for r_tuning in r_t:
     print('======================================')
+    # Tuning parameter
+    print('Tuning parameter:')
     print('r_tuning = {}'.format(r_tuning))
+    print('max iteration = {}'.format(args.max_iterations))
+    print('convergence_threshold = {}'.format(args.convergence_threshold))
+    # Dataset
+    print('r range = [{}, {}]'.format(args.position_gt_rleft_bound, args.position_gt_rright_bound))
+    print('theta range = [{}, {}] deg'.format(args.position_gt_thetaleft_bound, args.position_gt_thetaright_bound))
+    print('# sample points of r = {}'.format(args.m_r))
+    print('# sample points of theta = {}'.format(args.m_theta))
     # initialize
     x_pred = torch.zeros(samples_run, args.m_r*args.m_theta, dtype=torch.cfloat, device=device)
     iterations = torch.zeros(samples_run, dtype=torch.int, device=device)
     
     # NUV-SSR 
     for i in range(samples_run):
-        x_pred[i], iterations[i] = NUV_SSR(args, A_dic, y_mean[i], r_tuning)
-
+        x_pred[i], iterations[i] = NUV_SSR(args, A_dic, y_mean[i], r_tuning)   
+        print ('iterations = {}'.format(iterations[i]))
+    print('average iterations = {}'.format(torch.mean(iterations)))
+    
     # de-flatten x_pred [sample, m_r*m_theta] -> [sample, m_r, m_theta]
     x_pred_2D = utils.batch_de_flatten(x_pred, args.m_r, args.m_theta)
     
@@ -67,11 +78,11 @@ for r_tuning in r_t:
     pred_positions = utils.batch_convert_to_positions(peak_indices, r_positions, theta_positions)
     
     # convert to xy coordinates
-    pred_positions = utils.batch_polar_to_cartesian(pred_positions)
-    gt_positions = utils.batch_polar_to_cartesian(gt_positions)
+    pred_positions_xy = utils.batch_polar_to_cartesian(pred_positions)
+    gt_positions_xy = utils.batch_polar_to_cartesian(gt_positions)
 
-    # compute MSE
-    MSE = utils.batched_permuted_mse_2D(pred_positions, gt_positions) # mean square error for all samples   
+    # compute distance error
+    MSE = utils.batched_permuted_mse_2D(pred_positions_xy, gt_positions_xy) # mean square error for all samples   
     MSE = MSE * 2 # since we want distance error, no need to average over x and y
     RMSE = torch.sqrt(MSE)
     mean_RMSE = torch.mean(RMSE) # mean RMSE over all samples
@@ -86,10 +97,11 @@ print("Total Run Time:", t)
 SNR = 10*math.log10((args.x_var + args.mean_c) / args.r2)
 print('SNR = {}'.format(SNR))
 
-#### plotting ####
+# #### plotting ####
 import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
 import numpy as np
-### suppose k = 1 ###
+# ### suppose k = 1 ###
 
 ## plot predict positions
 # data in polar coordinates (radius, angle in radians)
@@ -99,12 +111,13 @@ r_gt = torch.squeeze(gt_positions[:, :, 0]).cpu().numpy()
 theta_gt = torch.squeeze(gt_positions[:, :, 1]).cpu().numpy()
 r_pred = torch.squeeze(pred_positions[:, :, 0]).cpu().numpy()
 theta_pred = torch.squeeze(pred_positions[:, :, 1]).cpu().numpy()
-# Create a polar subplot
+
+# # Create a polar subplot
 fig, ax = plt.subplots(subplot_kw={'projection': 'polar'})
 # Plot the first set of points using circles
 ax.plot(theta_gt, r_gt, 'o', label='GT')
 # Plot the second set of points using asterisks
-ax.plot(theta_gt, r_gt, '*', label='Pred')
+ax.plot(theta_pred, r_pred, '*', label='Pred')
 # draw the search range
 theta_l = args.position_gt_thetaleft_bound * math.pi / 180
 theta_r = args.position_gt_thetaright_bound * math.pi / 180
@@ -118,7 +131,7 @@ ax.fill_between(theta, r1, r2, color='green', alpha=0.5, label='Search Range')
 # Add a legend 
 ax.legend(loc='lower left')
 # save figure
-fig.savefig('simulations/Vanilla_default_sample=10.png')
+fig.savefig('simulations/positions.png')
 
 
 ## plot spectrum
@@ -129,7 +142,7 @@ r_positions = r_positions.cpu().numpy()
 theta_positions = theta_positions.cpu().numpy()
 # Choose which batch item to plot, here we select the first item
 batch_index = 0
-data_to_plot = spectrum_2D[batch_index, :, :]
+data_to_plot = spectrum_2D[batch_index, :, :].numpy()
 # Create a meshgrid for the radius and theta arrays
 R, Theta = np.meshgrid(r_positions, theta_positions, indexing='xy')
 X = R * np.cos(Theta)
@@ -138,13 +151,32 @@ Y = R * np.sin(Theta)
 fig = plt.figure()
 ax = fig.add_subplot(111, projection='3d')
 # Plot the 3D surface
-surface = ax.plot_surface(X, Y, data_to_plot.T, cmap='viridis')
+cmap = plt.cm.viridis
+colors = cmap(np.arange(cmap.N))
+colors[:, -1] = np.linspace(0.1, 1, cmap.N)  # Start with alpha=0.1 and gradually increase to 1
+light_cmap = mcolors.LinearSegmentedColormap.from_list('light_viridis', colors)
+surface = ax.plot_surface(X, Y, data_to_plot.T, cmap=light_cmap)
+# plot gt positions and pred positions
+x_gt = gt_positions_xy[batch_index, :, 0].cpu().numpy() 
+y_gt = gt_positions_xy[batch_index, :, 1].cpu().numpy()
+x_pred = pred_positions_xy[batch_index, :, 0].cpu().numpy()
+y_pred = pred_positions_xy[batch_index, :, 1].cpu().numpy()
+r_index_gt = np.argmin(np.abs(r_positions - r_gt[batch_index]))
+theta_index_gt = np.argmin(np.abs(theta_positions - theta_gt[batch_index]))
+r_index_pred = np.argmin(np.abs(r_positions - r_pred[batch_index]))
+theta_index_pred = np.argmin(np.abs(theta_positions - theta_pred[batch_index]))
+z_value_gt = data_to_plot.T[theta_index_gt, r_index_gt]
+z_value_pred = data_to_plot.T[theta_index_pred, r_index_pred]
+ax.scatter([x_gt], [y_gt], [z_value_gt], color='r', s=50, label='Ground Truth')
+ax.scatter([x_pred], [y_pred], [z_value_pred], color='b', s=50, label='Predicted')
+# add a legend
+ax.legend(loc='upper left')
 # add a color bar
 cbar = fig.colorbar(surface, shrink=0.5, aspect=5)
-cbar.set_label('Intensity')
+cbar.set_label('Spectrum height')
 # Set labels for axes
 ax.set_xlabel('X')
 ax.set_ylabel('Y')
-ax.set_zlabel('Intensity')
+ax.set_zlabel('Spectrum')
 # save figure
 fig.savefig('simulations/spectrum.png')

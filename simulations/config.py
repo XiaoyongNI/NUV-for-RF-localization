@@ -10,11 +10,11 @@ def general_settings():
                         help='input dataset size')
     parser.add_argument('--k', type=int, default=1, metavar='k',
                         help='number of sources')
-    parser.add_argument('--n', type=int, default=10, metavar='n',
+    parser.add_argument('--n', type=int, default=16, metavar='n',
                         help='number of ULA elements')
-    parser.add_argument('--m_r', type=int, default=11, metavar='m_r',
+    parser.add_argument('--m_r', type=int, default=21, metavar='m_r',
                         help='number of grids in r')
-    parser.add_argument('--m_theta', type=int, default=31, metavar='m_theta',
+    parser.add_argument('--m_theta', type=int, default=2000, metavar='m_theta',
                         help='number of grids in theta')
 
 
@@ -41,7 +41,7 @@ def general_settings():
                         help='initial guess of q')
     parser.add_argument('--max_iterations', type=int, default=10000, metavar='max_iterations',
                         help='maximum number of iterations')
-    parser.add_argument('--convergence_threshold', type=float, default=4e-4, metavar='convergence_threshold',
+    parser.add_argument('--convergence_threshold', type=float, default=1e-4, metavar='convergence_threshold',
                         help='convergence threshold')
     parser.add_argument('--resol', type=float, default=0.05, metavar='resol',
                         help='resolution of spatial filter')
@@ -62,9 +62,9 @@ def general_settings():
                         help='left boundary of ground truth position r axis')
     parser.add_argument('--position_gt_rright_bound', type=float, default=550, metavar='position_gt_rright_bound',
                         help='right boundary of ground truth position r axis')
-    parser.add_argument('--position_gt_thetaleft_bound', type=float, default=30, metavar='position_gt_thetaleft_bound',
+    parser.add_argument('--position_gt_thetaleft_bound', type=float, default=45, metavar='position_gt_thetaleft_bound',
                         help='left boundary of ground truth position theta axis (degree)')
-    parser.add_argument('--position_gt_thetaright_bound', type=float, default=45, metavar='position_gt_thetaright_bound',
+    parser.add_argument('--position_gt_thetaright_bound', type=float, default=60, metavar='position_gt_thetaright_bound',
                         help='right boundary of ground truth position theta axis (degree)')
     
 

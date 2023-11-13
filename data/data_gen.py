@@ -63,6 +63,8 @@ class DataGenerator:
             ULA_array_batch = ULA_array.unsqueeze(0).repeat(self.args.sample, 1, 1)
             # compute distances from each source to each ULA element (polar coordinates)
             distances = polar_distance(source[:, :, 0], source[:, :, 1], ULA_array_batch[:, :, 0], ULA_array_batch[:, :, 1])
+            # compute relative distances from the first ULA element
+            distances = distances - distances[:, 0].unsqueeze(1).repeat(1, self.args.n)
             # compute phase shifts
             phase_shifts = distances * 2 * math.pi / self.args.wave_length
             # compute steering matrix
@@ -132,6 +134,8 @@ class DataGenerator:
         position_pairs_batch = position_pairs.unsqueeze(1).repeat(1, self.args.n, 1)
         # compute distances from each hypothesis source to each ULA element (polar coordinates)
         distances = polar_distance(position_pairs_batch[:, :, 0], position_pairs_batch[:, :, 1], ULA_array_batch[:, :, 0], ULA_array_batch[:, :, 1])
+        # compute relative distances from the first ULA element
+        distances = distances - distances[:, 0].unsqueeze(1).repeat(1, self.args.n)
         # compute phase shifts
         phase_shifts = distances * 2 * math.pi / self.args.wave_length
         # compute steering matrix
