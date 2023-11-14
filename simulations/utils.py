@@ -151,7 +151,7 @@ def batch_peak_finding_2D(u, k):
   topk_values, topk_flat_indices = torch.topk(flat_peak_values, k, dim=1)
 
   # Convert the flat indices back to 2D indices
-  peak_indices_2D = (topk_flat_indices // peak_values.size(2), topk_flat_indices % peak_values.size(2))
+  peak_indices_2D = (torch.div(topk_flat_indices, peak_values.size(2), rounding_mode='floor'), topk_flat_indices % peak_values.size(2))
 
   # Prepare the 2D indices for each batch
   peak_batch_indices = torch.arange(0, spectrum.size(0), device=device).reshape(-1, 1).expand(-1, k)
@@ -218,14 +218,13 @@ def batch_convert_to_doa(peak_indices, m):
 # batch version of Convert from indices to 2D positions
 def batch_convert_to_positions(peak_indices, x1_positions, x2_positions):
   """
-  since there was a transpose in the dictionary matrix, the order of x1 and x2 is reversed
   input: peak_indices, tensor of size [batch_size, k, 3], (sample_id, x1, x2)
           x1_positions, tensor of size [m_r or m_x]
           theta_positions, tensor of size [m_theta or m_y] 
   output: positions, tensor of size [batch_size, k, 3]
   """
-  pred_x1 = x1_positions[peak_indices[:, :, 2]]
-  pred_x2 = x2_positions[peak_indices[:, :, 1]]
+  pred_x1 = x1_positions[peak_indices[:, :, 1]]
+  pred_x2 = x2_positions[peak_indices[:, :, 2]]
   pred_x1 = pred_x1.unsqueeze(2)
   pred_x2 = pred_x2.unsqueeze(2)
   positions = torch.cat((pred_x1, pred_x2), dim=2)

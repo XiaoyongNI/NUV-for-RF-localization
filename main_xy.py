@@ -35,7 +35,7 @@ r_t = [1]
 args.plot_discrete_spectrum = True
 # other parameters
 args.m_x = 2
-args.m_y = 2
+args.m_y = 3
 m = args.m_x * args.m_y # total num of hypotheses
 args.n = 5
 args.on_grid = True

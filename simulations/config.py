@@ -12,13 +12,13 @@ def general_settings():
                         help='number of sources')
     parser.add_argument('--n', type=int, default=16, metavar='n',
                         help='number of ULA elements')
-    parser.add_argument('--m_r', type=int, default=21, metavar='m_r',
+    parser.add_argument('--m_r', type=int, default=11, metavar='m_r',
                         help='number of grids in r')
-    parser.add_argument('--m_theta', type=int, default=2000, metavar='m_theta',
+    parser.add_argument('--m_theta', type=int, default=16, metavar='m_theta',
                         help='number of grids in theta')
     parser.add_argument('--m_x', type=int, default=2, metavar='m_x',
                         help='number of grids in x')
-    parser.add_argument('--m_y', type=int, default=2, metavar='m_y',
+    parser.add_argument('--m_y', type=int, default=3, metavar='m_y',
                         help='number of grids in y')
 
 
@@ -43,7 +43,7 @@ def general_settings():
                         help='if True, use CUDA')
     parser.add_argument('--q_init', type=float, default=0.01, metavar='q_init',
                         help='initial guess of q')
-    parser.add_argument('--max_iterations', type=int, default=10000, metavar='max_iterations',
+    parser.add_argument('--max_iterations', type=int, default=100000, metavar='max_iterations',
                         help='maximum number of iterations')
     parser.add_argument('--convergence_threshold', type=float, default=1e-4, metavar='convergence_threshold',
                         help='convergence threshold')

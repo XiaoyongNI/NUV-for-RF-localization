@@ -225,7 +225,7 @@ class DataGenerator:
         # convert deg to rad
         theta_positions = theta_positions * math.pi / 180 
         # Create a meshgrid of all r, theta pairs
-        R, Theta = torch.meshgrid(r_positions, theta_positions, indexing='xy')
+        Theta, R = torch.meshgrid(theta_positions, r_positions, indexing='xy')
         # Flatten the meshgrids to create vectors of r and theta
         r_vector = R.flatten()
         theta_vector = Theta.flatten()
@@ -260,7 +260,7 @@ class DataGenerator:
         x_positions = torch.linspace(x_left, x_right, steps=self.args.m_x, dtype=torch.float32, device=self.device)
         y_positions = torch.linspace(y_left, y_right, steps=self.args.m_y, dtype=torch.float32, device=self.device)
         # Create a meshgrid of all x, y pairs
-        X, Y = torch.meshgrid(x_positions, y_positions, indexing='xy')
+        Y, X = torch.meshgrid(y_positions, x_positions, indexing='xy')
         # Flatten the meshgrids to create vectors of x and y
         x_vector = X.flatten()
         y_vector = Y.flatten()

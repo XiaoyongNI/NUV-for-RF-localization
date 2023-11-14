@@ -11,7 +11,7 @@ from data.data_gen import DataGenerator
 
 #### initialization ####
 args = config.general_settings()
-args.use_cuda = False
+args.use_cuda = True
 # GPU or CPU
 if args.use_cuda:
    if torch.cuda.is_available():
@@ -22,17 +22,17 @@ if args.use_cuda:
 else:
     device = torch.device('cpu')
     print("Using CPU")
-# number of samples
-args.sample = 10
-samples_run = args.sample
 # searching the best performed tuning parameter r (std of observation noise)
 r_t = [10]
-# total num of hypotheses
-m = args.m_r * args.m_theta
 # path names
-plot_folder = 'simulations/plot/'
+plot_folder = 'simulations/plots/'
 data_folder = 'data/'
 data_file_name = 'default_sample=10.pt'
+# dataset settings
+args.sample = 10 # number of samples
+samples_run = args.sample
+m = args.m_r * args.m_theta # total num of hypotheses
+# args.on_grid = True
 
 #### Generate data ####
 generator = DataGenerator(args)
@@ -146,7 +146,7 @@ theta_positions = theta_positions.cpu().numpy()
 batch_index = 0
 data_to_plot = spectrum_2D[batch_index, :, :].numpy()
 # Create a meshgrid for the radius and theta arrays
-R, Theta = np.meshgrid(r_positions, theta_positions, indexing='xy')
+Theta, R = np.meshgrid(theta_positions, r_positions, indexing='xy')
 X = R * np.cos(Theta)
 Y = R * np.sin(Theta)
 # gt positions and pred positions
