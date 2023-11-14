@@ -1,7 +1,3 @@
-##########################################################
-################### simulating NUV-SSR ###################
-##########################################################
-
 import torch
 import math
 import time
@@ -30,15 +26,19 @@ else:
 args.sample = 10
 samples_run = args.sample
 # searching the best performed tuning parameter r (std of observation noise)
-r_t = [1e-0]
+r_t = [10]
 # total num of hypotheses
 m = args.m_r * args.m_theta
+# path names
+plot_folder = 'simulations/plot/'
+data_folder = 'data/'
+data_file_name = 'default_sample=10.pt'
 
 #### Generate data ####
 generator = DataGenerator(args)
 gt_positions, x_true, y_train = generator.generate_experiment_data_rtheta()
-torch.save([gt_positions, x_true, y_train], 'data/Vanilla_default_sample=10.pt')
-[gt_positions, x_true, y_train] = torch.load('data/Vanilla_default_sample=10.pt', map_location=device)
+torch.save([gt_positions, x_true, y_train], data_folder+data_file_name)
+[gt_positions, x_true, y_train] = torch.load(data_folder+data_file_name, map_location=device)
 # generate dictionary matrix A_dic, and corresponding hypothesis positions (r, theta)
 A_dic, r_positions, theta_positions = generator.dictionary_matrix_rtheta() 
 A_dic = A_dic.to(device)
@@ -107,8 +107,8 @@ import numpy as np
 
 ## plot predict positions
 # data in polar coordinates (radius, angle in radians)
-torch.save([gt_positions, pred_positions], 'simulations/positions.pt')
-[gt_positions, pred_positions] = torch.load('simulations/positions.pt', map_location=device)
+torch.save([gt_positions, pred_positions], plot_folder+'positions.pt')
+[gt_positions, pred_positions] = torch.load(plot_folder+'positions.pt', map_location=device)
 r_gt = torch.squeeze(gt_positions[:, :, 0],1).cpu().numpy()
 theta_gt = torch.squeeze(gt_positions[:, :, 1],1).cpu().numpy()
 r_pred = torch.squeeze(pred_positions[:, :, 0],1).cpu().numpy()
@@ -133,13 +133,13 @@ ax.fill_between(theta, r1, r2, color='green', alpha=0.5, label='Search Range')
 # Add a legend 
 ax.legend(loc='lower left')
 # save figure
-fig.savefig('simulations/positions.png')
+fig.savefig(plot_folder+'positions.png')
 
 
 ## plot spectrum
 spectrum_2D = torch.abs(x_pred_2D)
-torch.save(spectrum_2D, 'simulations/spectrum.pt')
-spectrum_2D = torch.load('simulations/spectrum.pt', map_location='cpu')
+torch.save(spectrum_2D, plot_folder+'spectrum.pt')
+spectrum_2D = torch.load(plot_folder+'spectrum.pt', map_location='cpu')
 r_positions = r_positions.cpu().numpy()
 theta_positions = theta_positions.cpu().numpy()
 # Choose which batch item to plot, here we select the first item
@@ -149,36 +149,54 @@ data_to_plot = spectrum_2D[batch_index, :, :].numpy()
 R, Theta = np.meshgrid(r_positions, theta_positions, indexing='xy')
 X = R * np.cos(Theta)
 Y = R * np.sin(Theta)
-# Start a new figure and add a 3D subplot
-fig = plt.figure()
-ax = fig.add_subplot(111, projection='3d')
-# Plot the 3D surface
-cmap = plt.cm.viridis
-colors = cmap(np.arange(cmap.N))
-colors[:, -1] = np.linspace(0.1, 1, cmap.N)  # Start with alpha=0.1 and gradually increase to 1
-light_cmap = mcolors.LinearSegmentedColormap.from_list('light_viridis', colors)
-surface = ax.plot_surface(X, Y, data_to_plot.T, cmap=light_cmap)
-# plot gt positions and pred positions
+# gt positions and pred positions
 x_gt = gt_positions_xy[batch_index, :, 0].cpu().numpy() 
 y_gt = gt_positions_xy[batch_index, :, 1].cpu().numpy()
 x_pred = pred_positions_xy[batch_index, :, 0].cpu().numpy()
 y_pred = pred_positions_xy[batch_index, :, 1].cpu().numpy()
-r_index_gt = np.argmin(np.abs(r_positions - r_gt[batch_index]))
-theta_index_gt = np.argmin(np.abs(theta_positions - theta_gt[batch_index]))
-r_index_pred = np.argmin(np.abs(r_positions - r_pred[batch_index]))
-theta_index_pred = np.argmin(np.abs(theta_positions - theta_pred[batch_index]))
-z_value_gt = data_to_plot.T[theta_index_gt, r_index_gt]
-z_value_pred = data_to_plot.T[theta_index_pred, r_index_pred]
-ax.scatter([x_gt], [y_gt], [z_value_gt], color='r', s=50, label='Ground Truth')
-ax.scatter([x_pred], [y_pred], [z_value_pred], color='b', s=50, label='Predicted')
-# add a legend
-ax.legend(loc='upper left')
-# add a color bar
-cbar = fig.colorbar(surface, shrink=0.5, aspect=5)
-cbar.set_label('Spectrum height')
-# Set labels for axes
-ax.set_xlabel('X')
-ax.set_ylabel('Y')
-ax.set_zlabel('Spectrum')
-# save figure
-fig.savefig('simulations/spectrum.png')
+# Create the plot
+plt.figure()
+plt.pcolormesh(X, Y, data_to_plot, cmap='hot', shading='nearest')  # Use pcolormesh
+# Plot ground truth and prediction positions
+plt.scatter(x_gt, y_gt, color='blue', label='Ground Truth')
+plt.scatter(x_pred, y_pred, color='green', label='Prediction')
+# Add a color bar and legend
+plt.colorbar()
+plt.legend()
+# Save the figure
+plt.savefig(plot_folder+'spectrum.png')
+ 
+
+
+########################
+### plot 3D spectrum ###
+########################
+# Start a new figure and add a 3D subplot
+# fig = plt.figure()
+# ax = fig.add_subplot(111, projection='3d')
+# # Plot the 3D surface
+# cmap = plt.cm.viridis
+# colors = cmap(np.arange(cmap.N))
+# colors[:, -1] = np.linspace(0.1, 1, cmap.N)  # Start with alpha=0.1 and gradually increase to 1
+# light_cmap = mcolors.LinearSegmentedColormap.from_list('light_viridis', colors)
+# surface = ax.plot_surface(X, Y, data_to_plot.T, cmap=light_cmap)
+# # plot gt positions and pred positions
+# r_index_gt = np.argmin(np.abs(r_positions - r_gt[batch_index]))
+# theta_index_gt = np.argmin(np.abs(theta_positions - theta_gt[batch_index]))
+# r_index_pred = np.argmin(np.abs(r_positions - r_pred[batch_index]))
+# theta_index_pred = np.argmin(np.abs(theta_positions - theta_pred[batch_index]))
+# z_value_gt = data_to_plot.T[theta_index_gt, r_index_gt]
+# z_value_pred = data_to_plot.T[theta_index_pred, r_index_pred]
+# ax.scatter([x_gt], [y_gt], [z_value_gt], color='r', s=50, label='Ground Truth')
+# ax.scatter([x_pred], [y_pred], [z_value_pred], color='b', s=50, label='Predicted')
+# # add a legend
+# ax.legend(loc='upper left')
+# # add a color bar
+# cbar = fig.colorbar(surface, shrink=0.5, aspect=5)
+# cbar.set_label('Spectrum height')
+# # Set labels for axes
+# ax.set_xlabel('X')
+# ax.set_ylabel('Y')
+# ax.set_zlabel('Spectrum')
+# # save figure
+# fig.savefig(plot_folder+'spectrum.png')
