@@ -33,6 +33,7 @@ args.sample = 10 # number of samples
 samples_run = args.sample
 m = args.m_r * args.m_theta # total num of hypotheses
 # args.on_grid = True
+args.plot_grid = False
 
 #### Generate data ####
 generator = DataGenerator(args)
@@ -147,22 +148,33 @@ batch_index = 0
 data_to_plot = spectrum_2D[batch_index, :, :].numpy()
 # Create a meshgrid for the radius and theta arrays
 Theta, R = np.meshgrid(theta_positions, r_positions, indexing='xy')
-X = R * np.cos(Theta)
-Y = R * np.sin(Theta)
 # gt positions and pred positions
-x_gt = gt_positions_xy[batch_index, :, 0].cpu().numpy() 
-y_gt = gt_positions_xy[batch_index, :, 1].cpu().numpy()
-x_pred = pred_positions_xy[batch_index, :, 0].cpu().numpy()
-y_pred = pred_positions_xy[batch_index, :, 1].cpu().numpy()
+r_gt = gt_positions[batch_index, :, 0].cpu().numpy() 
+theta_gt = gt_positions[batch_index, :, 1].cpu().numpy()
+r_pred = pred_positions[batch_index, :, 0].cpu().numpy()
+theta_pred = pred_positions[batch_index, :, 1].cpu().numpy()
 # Create the plot
 plt.figure()
-plt.pcolormesh(X, Y, data_to_plot, cmap='hot', shading='nearest')  # Use pcolormesh
+cmap = plt.cm.viridis
+colors = cmap(np.arange(cmap.N))
+colors[:, -1] = np.linspace(0.1, 1, cmap.N)  # Start with alpha=0.1 and gradually increase to 1
+light_cmap = mcolors.LinearSegmentedColormap.from_list('light_viridis', colors)
+plt.pcolormesh(R, Theta, data_to_plot, cmap=light_cmap, shading='nearest')  # Use pcolormesh
+
 # Plot ground truth and prediction positions
-plt.scatter(x_gt, y_gt, color='blue', label='Ground Truth')
-plt.scatter(x_pred, y_pred, color='green', label='Prediction')
+plt.scatter(r_gt, theta_gt, color='b', label='Ground Truth')
+plt.scatter(r_pred, theta_pred, color='r', label='Prediction')
 # Add a color bar and legend
 plt.colorbar()
 plt.legend()
+plt.xlabel('R')
+plt.ylabel('Theta')
+# add grid
+if args.plot_grid:
+    for r_line in R[:,0]:
+        plt.axvline(x=r_line, color='grey', linestyle='--', linewidth=0.5)
+    for theta_line in Theta[0,:]:
+        plt.axhline(y=theta_line, color='grey', linestyle='--', linewidth=0.5)
 # Save the figure
 plt.savefig(plot_folder+'spectrum.png')
  

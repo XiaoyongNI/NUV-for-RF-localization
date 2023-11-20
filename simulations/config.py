@@ -53,13 +53,13 @@ def general_settings():
     parser.add_argument('--coordinate', type=str, default='rtheta', metavar='coordinate',
                         help='coordinate system of ground truth position, can be rtheta or xy')
     # xy coordinates
-    parser.add_argument('--position_gt_xleft_bound', type=float, default=10, metavar='position_gt_xleft_bound',
+    parser.add_argument('--position_gt_xleft_bound', type=float, default=500, metavar='position_gt_xleft_bound',
                         help='left boundary of ground truth position x axis')
-    parser.add_argument('--position_gt_xright_bound', type=float, default=11, metavar='position_gt_xright_bound',
+    parser.add_argument('--position_gt_xright_bound', type=float, default=550, metavar='position_gt_xright_bound',
                         help='right boundary of ground truth position x axis')
-    parser.add_argument('--position_gt_yleft_bound', type=float, default=8, metavar='position_gt_yleft_bound',
+    parser.add_argument('--position_gt_yleft_bound', type=float, default=500, metavar='position_gt_yleft_bound',
                         help='left boundary of ground truth position y axis')   
-    parser.add_argument('--position_gt_yright_bound', type=float, default=9, metavar='position_gt_yright_bound',     
+    parser.add_argument('--position_gt_yright_bound', type=float, default=550, metavar='position_gt_yright_bound',     
                         help='right boundary of ground truth position y axis')
     # rtheta coordinates
     parser.add_argument('--position_gt_rleft_bound', type=float, default=500, metavar='position_gt_rleft_bound',
@@ -76,6 +76,8 @@ def general_settings():
     ### Plot settings
     parser.add_argument('--plot_discrete_spectrum', type=bool, default=True, metavar='plot_discrete_spectrum',
                         help='if True, plot discrete spectrum')
+    parser.add_argument('--plot_grid', type=bool, default=True, metavar='plot_grid',
+                        help='if True, plot grid')
     
 
     args = parser.parse_args()
