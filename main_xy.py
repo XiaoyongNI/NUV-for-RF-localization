@@ -26,18 +26,21 @@ if args.use_cuda:
 else:
     device = torch.device('cpu')
     print("Using CPU")
-# searching the best performed tuning parameter r (std of observation noise)
-r_t = [10]
 # path names
 plot_folder = 'simulations/plots/'
 data_folder = 'data/'
 data_file_name = 'default_sample=10.pt'
-# dataset settings
-args.sample = 10 # number of samples
-samples_run = args.sample
+
+# Tuning parameters
+args.q_init = 0.01
+r_tuning = 10
 args.m_x = 201
 args.m_y = 201
 m = args.m_x * args.m_y # total num of hypotheses
+args.convergence_threshold = 1e-4
+# dataset settings
+args.sample = 10 # number of samples
+samples_run = args.sample
 args.on_grid = False # gt positions are on grid or not
 args.plot_grid = True # plot grid or not
 
@@ -46,7 +49,7 @@ generator = DataGenerator(args)
 gt_positions, x_true, y_train = generator.generate_experiment_data_xy()
 torch.save([gt_positions, x_true, y_train], data_folder+data_file_name)
 [gt_positions, x_true, y_train] = torch.load(data_folder+data_file_name, map_location=device)
-# generate dictionary matrix A_dic, and corresponding hypothesis positions (r, theta)
+# generate dictionary matrix A_dic, and corresponding hypothesis positions 
 A_dic, x_positions, y_positions = generator.dictionary_matrix_xy() 
 A_dic = A_dic.to(device)
 x_positions = x_positions.to(device)
@@ -55,54 +58,57 @@ y_mean = y_train.mean(dim=1) # generate y_mean by averaging l snapshots for each
 
 #### estimation ####
 start = time.time()
-for r_tuning in r_t:
-    print('======================================')
-    # Tuning parameter
-    print('Tuning parameter:')
-    print('r_tuning = {}'.format(r_tuning))
-    print('max iteration = {}'.format(args.max_iterations))
-    print('convergence_threshold = {}'.format(args.convergence_threshold))
-    # Dataset
-    print('x range = [{}, {}]'.format(args.position_gt_xleft_bound, args.position_gt_xright_bound))
-    print('y range = [{}, {}] deg'.format(args.position_gt_yleft_bound, args.position_gt_yright_bound))
-    print('# sample points of x = {}'.format(args.m_x))
-    print('# sample points of y = {}'.format(args.m_y))
-    # initialize
-    x_pred = torch.zeros(samples_run, args.m_x*args.m_y, dtype=torch.cfloat, device=device)
-    iterations = torch.zeros(samples_run, dtype=torch.int, device=device)
-    
-    # NUV-SSR 
-    for i in range(samples_run):
-        x_pred[i], iterations[i] = NUV_SSR(args, A_dic, y_mean[i], r_tuning, m)   
-        print ('iterations = {}'.format(iterations[i]))
-    print('average iterations = {}'.format(torch.mean(iterations.float())))
+print('======================================')
+# Tuning parameter
+print('Tuning parameter:')
+print('r_tuning = {}'.format(r_tuning))
+print('max iteration = {}'.format(args.max_iterations))
+print('convergence_threshold = {}'.format(args.convergence_threshold))
+print('q init = {}'.format(args.q_init))
+# Dataset
+print('x range = [{}, {}]'.format(args.position_gt_xleft_bound, args.position_gt_xright_bound))
+print('y range = [{}, {}]'.format(args.position_gt_yleft_bound, args.position_gt_yright_bound))
+print('# sample points of x = {}'.format(args.m_x))
+print('# sample points of y = {}'.format(args.m_y))
+# initialize
+x_pred = torch.zeros(samples_run, args.m_x*args.m_y, dtype=torch.cfloat, device=device)
+iterations = torch.zeros(samples_run, dtype=torch.int, device=device)
 
-    x_pred_abs = torch.abs(x_pred) 
+# NUV-SSR 
+for i in range(samples_run):
+    x_pred[i], iterations[i] = NUV_SSR(args, A_dic, y_mean[i], r_tuning, m)   
+    print ('iterations = {}'.format(iterations[i]))
+print('average iterations = {}'.format(torch.mean(iterations.float())))
 
-    # de-flatten x_pred [sample, m_x*m_y] -> [sample, m_x, m_y]
-    x_pred_2D = utils.batch_de_flatten(x_pred, args.m_x, args.m_y)
-    
-    # find peaks [sample, k, 2]
-    peak_indices = utils.batch_peak_finding_2D(x_pred_2D, args.k)
-    
-    # convert to positions [sample, k, 2]
-    pred_positions = utils.batch_convert_to_positions(peak_indices, x_positions, y_positions)
+x_pred_abs = torch.abs(x_pred) 
 
-    # compute distance error
-    MSE = utils.batched_permuted_mse_2D(pred_positions, gt_positions) # mean square error for all samples   
-    MSE = MSE * 2 # since we want distance error, no need to average over x and y
-    RMSE = torch.sqrt(MSE)
-    mean_RMSE = torch.mean(RMSE) # mean RMSE over all samples
-    
-    print('averaged RMSE (distance error) = {}'.format(mean_RMSE))
+# de-flatten x_pred [sample, m_x*m_y] -> [sample, m_x, m_y]
+x_pred_2D = utils.batch_de_flatten(x_pred, args.m_x, args.m_y)
 
+# find peaks [sample, k, 2]
+peak_indices = utils.batch_peak_finding_2D(x_pred_2D, args.k)
+
+# convert to positions [sample, k, 2]
+pred_positions = utils.batch_convert_to_positions(peak_indices, x_positions, y_positions)
 
 end = time.time()
 t = end - start
+
+# compute RMSEs
+squared_diffs_xy = utils.batched_permuted_SquareDiff_2D(pred_positions, gt_positions) 
+RMSE_distance = utils.RMSE_distance_error(squared_diffs_xy)
+RMSE_x, RMSE_y = utils.RMSE_AxisWise_error(squared_diffs_xy)
+
+print('averaged RMSE distance = {} [m]'.format(RMSE_distance))
+print('averaged RMSE x = {} [m]'.format(RMSE_x))
+print('averaged RMSE y = {} [m]'.format(RMSE_y))
+
+
+
 # Print Run Time
 print("Total Run Time:", t)
-# SNR = 10*math.log10((args.x_var + args.mean_c) / args.r2)
-# print('SNR = {}'.format(SNR))
+SNR = 10*math.log10((args.x_var + args.mean_c) / args.r2)
+print('SNR = {}'.format(SNR))
 
 # #### plotting ####
 import matplotlib.pyplot as plt
@@ -202,12 +208,12 @@ plt.savefig(plot_folder+'spectrum.png')
 # y_gt = gt_positions[batch_index, :, 1].cpu().numpy()
 # x_pred = pred_positions[batch_index, :, 0].cpu().numpy()
 # y_pred = pred_positions[batch_index, :, 1].cpu().numpy()
-# x_index_gt = np.argmin(np.abs(x_positions - x_gt[batch_index]))
-# y_index_gt = np.argmin(np.abs(y_positions - y_gt[batch_index]))
-# x_index_pred = np.argmin(np.abs(x_positions - x_pred[batch_index]))
-# y_index_pred = np.argmin(np.abs(y_positions - y_pred[batch_index]))
-# z_value_gt = data_to_plot.T[x_index_gt, y_index_gt]
-# z_value_pred = data_to_plot.T[x_index_pred, y_index_pred]
+# x_index_gt = np.argmin(np.abs(x_positions - x_gt))
+# y_index_gt = np.argmin(np.abs(y_positions - y_gt))
+# x_index_pred = np.argmin(np.abs(x_positions - x_pred))
+# y_index_pred = np.argmin(np.abs(y_positions - y_pred))
+# z_value_gt = data_to_plot[x_index_gt, y_index_gt]
+# z_value_pred = data_to_plot[x_index_pred, y_index_pred]
 # ax.scatter([x_gt], [y_gt], [z_value_gt], color='r', s=50, label='Ground Truth')
 # ax.scatter([x_pred], [y_pred], [z_value_pred], color='b', s=50, label='Predicted')
 

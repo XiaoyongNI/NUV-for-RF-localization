@@ -300,7 +300,7 @@ def batched_permuted_mse_1D(pred, DOA):
 # permuted MSE 2D
 
 # batch version of permuted MSE 2D
-def batched_permuted_mse_2D(pred, gt):
+def batched_permuted_SquareDiff_2D(pred, gt):
   """
   input: pred, tensor of size [batch_size, k, 2]
           gt, tensor of size [batch_size, k, 2]
@@ -326,10 +326,45 @@ def batched_permuted_mse_2D(pred, gt):
   # Expand gt for broadcasting
   expanded_gt = gt.unsqueeze(1).expand(-1, perms.shape[1], -1, -1)  # [batch_size, k!, k, 2]
   squared_diffs = (permuted_preds - expanded_gt)**2
+
+  return squared_diffs
+
+def RMSE_distance_error(squared_diffs):
+  """
+  input: squared_diffs, tensor of size [batch_size, k!, k, 2] in cartesian coordinates
+  output: RMSE, one value
+  """
+
+  # mean over k targets and 2 axis(x, y or r, theta)
   mse = torch.mean(squared_diffs, dim=(-2, -1))  # [batch_size, k!]
 
-  # Step 4: Find the minimum MSE for each sample
+  # Find the minimum MSE for each sample
   min_mse, _ = torch.min(mse, dim=1)  # [batch_size]
 
-  return min_mse
+  min_mse = min_mse * 2 # since we want distance error, no need to average over x and y or r and theta
+  RMSE_error = torch.sqrt(min_mse)
+  mean_RMSE_error = torch.mean(RMSE_error) # mean RMSE over all samples
 
+  return mean_RMSE_error
+
+def RMSE_AxisWise_error(squared_diffs):
+  """
+  Compute RMSE for each axis (x, y or r, theta)
+  input: squared_diffs, tensor of size [batch_size, k!, k, 2]
+  output: RMSE_axis1, RMSE_axis2, two values
+  """
+  # mean over k targets
+  mse = torch.mean(squared_diffs, dim=2)  # [batch_size, k!, 2]
+  # separate x and y or r and theta
+  mse_axis1 = mse[:, :, 0] # [batch_size, k!]
+  mse_axis2 = mse[:, :, 1] # [batch_size, k!]
+  # Find the minimum MSE for each sample
+  min_mse_axis1, _ = torch.min(mse_axis1, dim=1)  # [batch_size]
+  min_mse_axis2, _ = torch.min(mse_axis2, dim=1)  # [batch_size]
+  # RMSE for each axis
+  RMSE_axis1 = torch.sqrt(min_mse_axis1)
+  RMSE_axis2 = torch.sqrt(min_mse_axis2)
+  mean_RMSE_axis1 = torch.mean(RMSE_axis1)
+  mean_RMSE_axis2 = torch.mean(RMSE_axis2)
+
+  return mean_RMSE_axis1, mean_RMSE_axis2

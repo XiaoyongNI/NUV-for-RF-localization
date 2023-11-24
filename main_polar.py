@@ -1,17 +1,16 @@
 import torch
 import math
 import time
+import scipy.io
 
 from NUV import NUV_SSR
-
 from simulations import utils
 from simulations import config
 from data.data_gen import DataGenerator
 
-
 #### initialization ####
 args = config.general_settings()
-args.use_cuda = True
+args.use_cuda = False
 # GPU or CPU
 if args.use_cuda:
    if torch.cuda.is_available():
@@ -22,18 +21,23 @@ if args.use_cuda:
 else:
     device = torch.device('cpu')
     print("Using CPU")
-# searching the best performed tuning parameter r (std of observation noise)
-r_t = [10]
 # path names
 plot_folder = 'simulations/plots/'
 data_folder = 'data/'
-data_file_name = 'default_sample=10.pt'
+data_file_name = 'data_polar_default.pt'
+matlab_file_name = 'result_polar_default.mat'
+# Tuning parameters
+args.q_init = 0.01
+r_tuning = 1
+args.m_r = 10
+args.m_theta = 91
+m = args.m_r * args.m_theta # total num of hypotheses
+args.convergence_threshold = 4e-4
 # dataset settings
 args.sample = 10 # number of samples
 samples_run = args.sample
-m = args.m_r * args.m_theta # total num of hypotheses
-# args.on_grid = True
-args.plot_grid = False
+args.on_grid = False # gt positions are on grid or not
+args.plot_grid = True # plot grid or not
 
 #### Generate data ####
 generator = DataGenerator(args)
@@ -49,52 +53,54 @@ y_mean = y_train.mean(dim=1) # generate y_mean by averaging l snapshots for each
 
 #### estimation ####
 start = time.time()
-for r_tuning in r_t:
-    print('======================================')
-    # Tuning parameter
-    print('Tuning parameter:')
-    print('r_tuning = {}'.format(r_tuning))
-    print('max iteration = {}'.format(args.max_iterations))
-    print('convergence_threshold = {}'.format(args.convergence_threshold))
-    # Dataset
-    print('r range = [{}, {}]'.format(args.position_gt_rleft_bound, args.position_gt_rright_bound))
-    print('theta range = [{}, {}] deg'.format(args.position_gt_thetaleft_bound, args.position_gt_thetaright_bound))
-    print('# sample points of r = {}'.format(args.m_r))
-    print('# sample points of theta = {}'.format(args.m_theta))
-    # initialize
-    x_pred = torch.zeros(samples_run, args.m_r*args.m_theta, dtype=torch.cfloat, device=device)
-    iterations = torch.zeros(samples_run, dtype=torch.int, device=device)
-    
-    # NUV-SSR 
-    for i in range(samples_run):
-        x_pred[i], iterations[i] = NUV_SSR(args, A_dic, y_mean[i], r_tuning, m)   
-        print ('iterations = {}'.format(iterations[i]))
-    print('average iterations = {}'.format(torch.mean(iterations.float())))
-    
-    # de-flatten x_pred [sample, m_r*m_theta] -> [sample, m_r, m_theta]
-    x_pred_2D = utils.batch_de_flatten(x_pred, args.m_r, args.m_theta)
-    
-    # find peaks [sample, k, 2]
-    peak_indices = utils.batch_peak_finding_2D(x_pred_2D, args.k)
-    
-    # convert to positions [sample, k, 2]
-    pred_positions = utils.batch_convert_to_positions(peak_indices, r_positions, theta_positions)
-    
-    # convert to xy coordinates
-    pred_positions_xy = utils.batch_polar_to_cartesian(pred_positions)
-    gt_positions_xy = utils.batch_polar_to_cartesian(gt_positions)
+print('======================================')
+# Tuning parameter
+print('Tuning parameter:')
+print('r_tuning = {}'.format(r_tuning))
+print('max iteration = {}'.format(args.max_iterations))
+print('convergence_threshold = {}'.format(args.convergence_threshold))
+# Dataset
+print('r range = [{}, {}]'.format(args.position_gt_rleft_bound, args.position_gt_rright_bound))
+print('theta range = [{}, {}] deg'.format(args.position_gt_thetaleft_bound, args.position_gt_thetaright_bound))
+print('# sample points of r = {}'.format(args.m_r))
+print('# sample points of theta = {}'.format(args.m_theta))
+# initialize
+x_pred = torch.zeros(samples_run, args.m_r*args.m_theta, dtype=torch.cfloat, device=device)
+iterations = torch.zeros(samples_run, dtype=torch.int, device=device)
 
-    # compute distance error
-    MSE = utils.batched_permuted_mse_2D(pred_positions_xy, gt_positions_xy) # mean square error for all samples   
-    MSE = MSE * 2 # since we want distance error, no need to average over x and y
-    RMSE = torch.sqrt(MSE)
-    mean_RMSE = torch.mean(RMSE) # mean RMSE over all samples
-    
-    print('averaged RMSE (distance error) = {}'.format(mean_RMSE))
+# NUV-SSR 
+for i in range(samples_run):
+    x_pred[i], iterations[i] = NUV_SSR(args, A_dic, y_mean[i], r_tuning, m)   
+    print ('iterations = {}'.format(iterations[i]))
+print('average iterations = {}'.format(torch.mean(iterations.float())))
 
+# de-flatten x_pred [sample, m_r*m_theta] -> [sample, m_r, m_theta]
+x_pred_2D = utils.batch_de_flatten(x_pred, args.m_r, args.m_theta)
+
+# find peaks [sample, k, 2]
+peak_indices = utils.batch_peak_finding_2D(x_pred_2D, args.k)
+
+# convert to positions [sample, k, 2]
+pred_positions = utils.batch_convert_to_positions(peak_indices, r_positions, theta_positions)
 
 end = time.time()
 t = end - start
+
+# convert to xy coordinates
+pred_positions_xy = utils.batch_polar_to_cartesian(pred_positions)
+gt_positions_xy = utils.batch_polar_to_cartesian(gt_positions)
+
+# compute RMSEs
+squared_diffs_xy = utils.batched_permuted_SquareDiff_2D(pred_positions_xy, gt_positions_xy) 
+RMSE_distance = utils.RMSE_distance_error(squared_diffs_xy)
+squared_diffs_polar = utils.batched_permuted_SquareDiff_2D(pred_positions, gt_positions)
+RMSE_r, RMSE_theta = utils.RMSE_AxisWise_error(squared_diffs_polar)
+RMSE_theta = RMSE_theta * 180 / math.pi
+
+print('averaged RMSE distance = {} [m]'.format(RMSE_distance))
+print('averaged RMSE r = {} [m]'.format(RMSE_r))
+print('averaged RMSE theta = {} [deg]'.format(RMSE_theta))
+
 # Print Run Time
 print("Total Run Time:", t)
 SNR = 10*math.log10((args.x_var + args.mean_c) / args.r2)
@@ -103,9 +109,10 @@ print('SNR = {}'.format(SNR))
 # #### plotting ####
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
+from matplotlib.patches import Circle
+from matplotlib.lines import Line2D
 import numpy as np
 # ### suppose k = 1 ###
-
 ## plot predict positions
 # data in polar coordinates (radius, angle in radians)
 torch.save([gt_positions, pred_positions], plot_folder+'positions.pt')
@@ -148,33 +155,45 @@ batch_index = 0
 data_to_plot = spectrum_2D[batch_index, :, :].numpy()
 # Create a meshgrid for the radius and theta arrays
 Theta, R = np.meshgrid(theta_positions, r_positions, indexing='xy')
+X = R * np.cos(Theta)
+Y = R * np.sin(Theta)
 # gt positions and pred positions
-r_gt = gt_positions[batch_index, :, 0].cpu().numpy() 
-theta_gt = gt_positions[batch_index, :, 1].cpu().numpy()
-r_pred = pred_positions[batch_index, :, 0].cpu().numpy()
-theta_pred = pred_positions[batch_index, :, 1].cpu().numpy()
+# r_gt = gt_positions[batch_index, :, 0].cpu().numpy() 
+# theta_gt = gt_positions[batch_index, :, 1].cpu().numpy()
+# r_pred = pred_positions[batch_index, :, 0].cpu().numpy()
+# theta_pred = pred_positions[batch_index, :, 1].cpu().numpy()
+x_gt = gt_positions_xy[batch_index, :, 0].cpu().numpy() 
+y_gt = gt_positions_xy[batch_index, :, 1].cpu().numpy()
+x_pred = pred_positions_xy[batch_index, :, 0].cpu().numpy()
+y_pred = pred_positions_xy[batch_index, :, 1].cpu().numpy()
 # Create the plot
 plt.figure()
 cmap = plt.cm.viridis
 colors = cmap(np.arange(cmap.N))
 colors[:, -1] = np.linspace(0.1, 1, cmap.N)  # Start with alpha=0.1 and gradually increase to 1
 light_cmap = mcolors.LinearSegmentedColormap.from_list('light_viridis', colors)
-plt.pcolormesh(R, Theta, data_to_plot, cmap=light_cmap, shading='nearest')  # Use pcolormesh
-
+plt.pcolormesh(X, Y, data_to_plot, cmap=light_cmap, shading='nearest')  # Use pcolormesh
 # Plot ground truth and prediction positions
-plt.scatter(r_gt, theta_gt, color='b', label='Ground Truth')
-plt.scatter(r_pred, theta_pred, color='r', label='Prediction')
-# Add a color bar and legend
+plt.scatter(x_gt, y_gt, color='b', label='Ground Truth')
+plt.scatter(x_pred, y_pred, color='r', label='Prediction')
+# Plot the std
+circle = Circle((x_pred, y_pred), RMSE_distance, color='r', fill=False, linewidth=0.5)
+plt.gca().add_patch(circle)
+gt_proxy = Line2D([0], [0], linestyle='none', marker='o', color='b', markerfacecolor='b')
+pred_proxy = Line2D([0], [0], linestyle='none', marker='o', color='r', markerfacecolor='r')
+circle_proxy = Line2D([0], [0], linestyle="none", marker="o", color='r', markerfacecolor="none", markersize=10, markeredgewidth=2)
+# Add the proxy artists to the legend
+plt.legend(handles=[gt_proxy, pred_proxy, circle_proxy], labels=['Ground Truth', 'Prediction', 'std'], loc='upper right')
+# Add a color bar and label
 plt.colorbar()
-plt.legend()
-plt.xlabel('R')
-plt.ylabel('Theta')
+plt.xlabel('X [m]')
+plt.ylabel('Y [m]')
 # add grid
-if args.plot_grid:
-    for r_line in R[:,0]:
-        plt.axvline(x=r_line, color='grey', linestyle='--', linewidth=0.5)
-    for theta_line in Theta[0,:]:
-        plt.axhline(y=theta_line, color='grey', linestyle='--', linewidth=0.5)
+# if args.plot_grid:
+#     for r_line in R[:,0]:
+#         plt.axvline(x=r_line, color='grey', linestyle='--', linewidth=0.5)
+#     for theta_line in Theta[0,:]:
+#         plt.axhline(y=theta_line, color='grey', linestyle='--', linewidth=0.5)
 # Save the figure
 plt.savefig(plot_folder+'spectrum.png')
  
@@ -212,3 +231,26 @@ plt.savefig(plot_folder+'spectrum.png')
 # ax.set_zlabel('Spectrum')
 # # save figure
 # fig.savefig(plot_folder+'spectrum.png')
+
+
+#######################
+### Save for MATLAB ###
+#######################
+# Save in a .mat file
+gt_positions_rtheta_np = gt_positions.cpu().numpy()
+gt_positions_xy_np = gt_positions_xy.cpu().numpy()
+pred_positions_rtheta_np = pred_positions.cpu().numpy()
+pred_positions_xy_np = pred_positions_xy.cpu().numpy()
+y_mean_np = y_mean.cpu().numpy()
+spectrum_2D_np = spectrum_2D.cpu().numpy()
+RMSE_distance = RMSE_distance.cpu().numpy()
+scipy.io.savemat(data_folder+matlab_file_name, 
+                 {'gt_positions_rtheta': gt_positions_rtheta_np, 
+                  'gt_positions_xy': gt_positions_xy_np, 
+                  'pred_positions_rtheta': pred_positions_rtheta_np, 
+                  'pred_positions_xy': pred_positions_xy_np, 
+                  'y_mean': y_mean_np, 
+                  'spectrum_2D': spectrum_2D_np,
+                  'r_positions': r_positions,
+                  'theta_positions': theta_positions,
+                  'RMSE_distance': RMSE_distance})
