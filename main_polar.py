@@ -41,14 +41,11 @@ args.plot_grid = True # plot grid or not
 
 #### Generate data ####
 generator = DataGenerator(args)
-gt_positions, x_true, y_train = generator.generate_experiment_data_rtheta()
-torch.save([gt_positions, x_true, y_train], data_folder+data_file_name)
-[gt_positions, x_true, y_train] = torch.load(data_folder+data_file_name, map_location=device)
+gt_positions, x_true, y_train, y_noiseless = generator.generate_experiment_data_rtheta()
+torch.save([gt_positions, x_true, y_train, y_noiseless], data_folder+data_file_name)
+[gt_positions, x_true, y_train, y_noiseless] = torch.load(data_folder+data_file_name, map_location=device)
 # generate dictionary matrix A_dic, and corresponding hypothesis positions (r, theta)
 A_dic, r_positions, theta_positions = generator.dictionary_matrix_rtheta() 
-A_dic = A_dic.to(device)
-r_positions = r_positions.to(device)
-theta_positions = theta_positions.to(device)
 y_mean = y_train.mean(dim=1) # generate y_mean by averaging l snapshots for each sample
 
 #### estimation ####
@@ -57,7 +54,7 @@ print('======================================')
 # Tuning parameter
 print('Tuning parameter:')
 print('r_tuning = {}'.format(r_tuning))
-print('max iteration = {}'.format(args.max_iterations))
+print('max EM steps = {}'.format(args.max_EM_steps))
 print('convergence_threshold = {}'.format(args.convergence_threshold))
 # Dataset
 print('r range = [{}, {}]'.format(args.position_gt_rleft_bound, args.position_gt_rright_bound))
@@ -66,13 +63,13 @@ print('# sample points of r = {}'.format(args.m_r))
 print('# sample points of theta = {}'.format(args.m_theta))
 # initialize
 x_pred = torch.zeros(samples_run, args.m_r*args.m_theta, dtype=torch.cfloat, device=device)
-iterations = torch.zeros(samples_run, dtype=torch.int, device=device)
+EM_steps = torch.zeros(samples_run, dtype=torch.int, device=device)
 
 # NUV-SSR 
 for i in range(samples_run):
-    x_pred[i], iterations[i] = NUV_SSR(args, A_dic, y_mean[i], r_tuning, m)   
-    print ('iterations = {}'.format(iterations[i]))
-print('average iterations = {}'.format(torch.mean(iterations.float())))
+    x_pred[i], EM_steps[i] = NUV_SSR(args, A_dic, y_mean[i], r_tuning, m)   
+    print ('EM steps = {}'.format(EM_steps[i]))
+print('average EM steps = {}'.format(torch.mean(EM_steps.float())))
 
 # de-flatten x_pred [sample, m_r*m_theta] -> [sample, m_r, m_theta]
 x_pred_2D = utils.batch_de_flatten(x_pred, args.m_r, args.m_theta)
@@ -104,7 +101,7 @@ print('averaged RMSE theta = {} [deg]'.format(RMSE_theta))
 # Print Run Time
 print("Total Run Time:", t)
 SNR = 10*math.log10((args.x_var + args.mean_c) / args.r2)
-print('SNR = {}'.format(SNR))
+print('SNR = {} [dB]'.format(SNR))
 
 # #### plotting ####
 import matplotlib.pyplot as plt
@@ -238,19 +235,26 @@ plt.savefig(plot_folder+'spectrum.png')
 #######################
 # Save in a .mat file
 gt_positions_rtheta_np = gt_positions.cpu().numpy()
-gt_positions_xy_np = gt_positions_xy.cpu().numpy()
 pred_positions_rtheta_np = pred_positions.cpu().numpy()
-pred_positions_xy_np = pred_positions_xy.cpu().numpy()
-y_mean_np = y_mean.cpu().numpy()
+
+y_train_np = y_train.cpu().numpy() 
+y_noiseless_np = y_noiseless.cpu().numpy()  
+
 spectrum_2D_np = spectrum_2D.cpu().numpy()
 RMSE_distance = RMSE_distance.cpu().numpy()
+RMSE_r = RMSE_r.cpu().numpy()
+RMSE_theta = RMSE_theta.cpu().numpy()
 scipy.io.savemat(data_folder+matlab_file_name, 
                  {'gt_positions_rtheta': gt_positions_rtheta_np, 
-                  'gt_positions_xy': gt_positions_xy_np, 
                   'pred_positions_rtheta': pred_positions_rtheta_np, 
-                  'pred_positions_xy': pred_positions_xy_np, 
-                  'y_mean': y_mean_np, 
+
+                  'y_train': y_train_np,
+                  'y_noiseless': y_noiseless_np,
+
                   'spectrum_2D': spectrum_2D_np,
                   'r_positions': r_positions,
                   'theta_positions': theta_positions,
-                  'RMSE_distance': RMSE_distance})
+
+                  'RMSE_distance': RMSE_distance,
+                  'RMSE_r': RMSE_r,
+                  'RMSE_theta': RMSE_theta})

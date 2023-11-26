@@ -51,9 +51,6 @@ torch.save([gt_positions, x_true, y_train], data_folder+data_file_name)
 [gt_positions, x_true, y_train] = torch.load(data_folder+data_file_name, map_location=device)
 # generate dictionary matrix A_dic, and corresponding hypothesis positions 
 A_dic, x_positions, y_positions = generator.dictionary_matrix_xy() 
-A_dic = A_dic.to(device)
-x_positions = x_positions.to(device)
-y_positions = y_positions.to(device)
 y_mean = y_train.mean(dim=1) # generate y_mean by averaging l snapshots for each sample
 
 #### estimation ####
@@ -62,7 +59,7 @@ print('======================================')
 # Tuning parameter
 print('Tuning parameter:')
 print('r_tuning = {}'.format(r_tuning))
-print('max iteration = {}'.format(args.max_iterations))
+print('max EM steps = {}'.format(args.max_EM_steps))
 print('convergence_threshold = {}'.format(args.convergence_threshold))
 print('q init = {}'.format(args.q_init))
 # Dataset
@@ -77,8 +74,8 @@ iterations = torch.zeros(samples_run, dtype=torch.int, device=device)
 # NUV-SSR 
 for i in range(samples_run):
     x_pred[i], iterations[i] = NUV_SSR(args, A_dic, y_mean[i], r_tuning, m)   
-    print ('iterations = {}'.format(iterations[i]))
-print('average iterations = {}'.format(torch.mean(iterations.float())))
+    print ('EM steps = {}'.format(iterations[i]))
+print('average EM steps = {}'.format(torch.mean(iterations.float())))
 
 x_pred_abs = torch.abs(x_pred) 
 
@@ -111,79 +108,79 @@ SNR = 10*math.log10((args.x_var + args.mean_c) / args.r2)
 print('SNR = {}'.format(SNR))
 
 # #### plotting ####
-import matplotlib.pyplot as plt
-import matplotlib.colors as mcolors
-import numpy as np
-# ### suppose k = 1 ###
+# import matplotlib.pyplot as plt
+# import matplotlib.colors as mcolors
+# import numpy as np
+# # ### suppose k = 1 ###
 
-## plot predict positions
-# data in polar coordinates (radius, angle in radians)
-torch.save([gt_positions, pred_positions], plot_folder+'positions.pt')
-[gt_positions, pred_positions] = torch.load(plot_folder+'positions.pt', map_location=device)
-x_gt = torch.squeeze(gt_positions[:, :, 0],1).cpu().numpy()
-y_gt = torch.squeeze(gt_positions[:, :, 1],1).cpu().numpy()
-x_pred = torch.squeeze(pred_positions[:, :, 0],1).cpu().numpy()
-y_pred = torch.squeeze(pred_positions[:, :, 1],1).cpu().numpy()
+# ## plot predict positions
+# # data in polar coordinates (radius, angle in radians)
+# torch.save([gt_positions, pred_positions], plot_folder+'positions.pt')
+# [gt_positions, pred_positions] = torch.load(plot_folder+'positions.pt', map_location=device)
+# x_gt = torch.squeeze(gt_positions[:, :, 0],1).cpu().numpy()
+# y_gt = torch.squeeze(gt_positions[:, :, 1],1).cpu().numpy()
+# x_pred = torch.squeeze(pred_positions[:, :, 0],1).cpu().numpy()
+# y_pred = torch.squeeze(pred_positions[:, :, 1],1).cpu().numpy()
 
-fig, ax = plt.subplots()
-# Plot the first set of points using circles
-ax.plot(x_gt, y_gt, 'o', label='GT')
-# Plot the second set of points using asterisks
-ax.plot(x_pred, y_pred, '*', label='Pred')
-# draw the search range
-x_left_bound = args.position_gt_xleft_bound
-x_right_bound = args.position_gt_xright_bound
-y_left_bound = args.position_gt_yleft_bound
-y_right_bound = args.position_gt_yright_bound
-# Plot the search range as a filled area
-ax.fill_between([x_left_bound, x_right_bound], [y_left_bound, y_left_bound], [y_right_bound, y_right_bound], color='g', alpha=0.1)
-# Add a legend 
-ax.legend(loc='lower left')
-# save figure
-fig.savefig(plot_folder+'positions.png')
+# fig, ax = plt.subplots()
+# # Plot the first set of points using circles
+# ax.plot(x_gt, y_gt, 'o', label='GT')
+# # Plot the second set of points using asterisks
+# ax.plot(x_pred, y_pred, '*', label='Pred')
+# # draw the search range
+# x_left_bound = args.position_gt_xleft_bound
+# x_right_bound = args.position_gt_xright_bound
+# y_left_bound = args.position_gt_yleft_bound
+# y_right_bound = args.position_gt_yright_bound
+# # Plot the search range as a filled area
+# ax.fill_between([x_left_bound, x_right_bound], [y_left_bound, y_left_bound], [y_right_bound, y_right_bound], color='g', alpha=0.1)
+# # Add a legend 
+# ax.legend(loc='lower left')
+# # save figure
+# fig.savefig(plot_folder+'positions.png')
 
-########################
-### plot 2D spectrum ###
-########################
-spectrum_2D = torch.abs(x_pred_2D)
-torch.save(spectrum_2D, plot_folder+'spectrum.pt')
-spectrum_2D = torch.load(plot_folder+'spectrum.pt', map_location='cpu')
-x_positions = x_positions.cpu().numpy()
-y_positions = y_positions.cpu().numpy()
-# Choose which batch item to plot, here we select the first item
-batch_index = 0
-data_to_plot = spectrum_2D[batch_index, :, :].numpy()
-# Create a meshgrid for the radius and theta arrays
-Y, X = np.meshgrid(y_positions, x_positions, indexing='xy')
-# gt positions and pred positions
-x_gt = gt_positions[batch_index, :, 0].cpu().numpy() 
-y_gt = gt_positions[batch_index, :, 1].cpu().numpy()
-x_pred = pred_positions[batch_index, :, 0].cpu().numpy()
-y_pred = pred_positions[batch_index, :, 1].cpu().numpy()
-# Create the plot
-plt.figure()
-cmap = plt.cm.viridis
-colors = cmap(np.arange(cmap.N))
-colors[:, -1] = np.linspace(0.1, 1, cmap.N)  # Start with alpha=0.1 and gradually increase to 1
-light_cmap = mcolors.LinearSegmentedColormap.from_list('light_viridis', colors)
-plt.pcolormesh(X, Y, data_to_plot, cmap=light_cmap, shading='nearest')  # Use pcolormesh
+# ########################
+# ### plot 2D spectrum ###
+# ########################
+# spectrum_2D = torch.abs(x_pred_2D)
+# torch.save(spectrum_2D, plot_folder+'spectrum.pt')
+# spectrum_2D = torch.load(plot_folder+'spectrum.pt', map_location='cpu')
+# x_positions = x_positions.cpu().numpy()
+# y_positions = y_positions.cpu().numpy()
+# # Choose which batch item to plot, here we select the first item
+# batch_index = 0
+# data_to_plot = spectrum_2D[batch_index, :, :].numpy()
+# # Create a meshgrid for the radius and theta arrays
+# Y, X = np.meshgrid(y_positions, x_positions, indexing='xy')
+# # gt positions and pred positions
+# x_gt = gt_positions[batch_index, :, 0].cpu().numpy() 
+# y_gt = gt_positions[batch_index, :, 1].cpu().numpy()
+# x_pred = pred_positions[batch_index, :, 0].cpu().numpy()
+# y_pred = pred_positions[batch_index, :, 1].cpu().numpy()
+# # Create the plot
+# plt.figure()
+# cmap = plt.cm.viridis
+# colors = cmap(np.arange(cmap.N))
+# colors[:, -1] = np.linspace(0.1, 1, cmap.N)  # Start with alpha=0.1 and gradually increase to 1
+# light_cmap = mcolors.LinearSegmentedColormap.from_list('light_viridis', colors)
+# plt.pcolormesh(X, Y, data_to_plot, cmap=light_cmap, shading='nearest')  # Use pcolormesh
 
-# Plot ground truth and prediction positions
-plt.scatter(x_gt, y_gt, color='b', label='Ground Truth')
-plt.scatter(x_pred, y_pred, color='r', label='Prediction')
-# Add a color bar and legend
-plt.colorbar()
-plt.legend()
-plt.xlabel('X')
-plt.ylabel('Y')
-# add grid
-if args.plot_grid:
-    for x_line in X[:,0]:
-        plt.axvline(x=x_line, color='grey', linestyle='--', linewidth=0.5)
-    for y_line in Y[0,:]:
-        plt.axhline(y=y_line, color='grey', linestyle='--', linewidth=0.5)
-# Save the figure
-plt.savefig(plot_folder+'spectrum.png')
+# # Plot ground truth and prediction positions
+# plt.scatter(x_gt, y_gt, color='b', label='Ground Truth')
+# plt.scatter(x_pred, y_pred, color='r', label='Prediction')
+# # Add a color bar and legend
+# plt.colorbar()
+# plt.legend()
+# plt.xlabel('X')
+# plt.ylabel('Y')
+# # add grid
+# if args.plot_grid:
+#     for x_line in X[:,0]:
+#         plt.axvline(x=x_line, color='grey', linestyle='--', linewidth=0.5)
+#     for y_line in Y[0,:]:
+#         plt.axhline(y=y_line, color='grey', linestyle='--', linewidth=0.5)
+# # Save the figure
+# plt.savefig(plot_folder+'spectrum.png')
 
 ########################
 ### plot 3D spectrum ###

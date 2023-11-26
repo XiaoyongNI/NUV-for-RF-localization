@@ -43,7 +43,7 @@ def general_settings():
                         help='if True, use CUDA')
     parser.add_argument('--q_init', type=float, default=0.01, metavar='q_init',
                         help='initial guess of q')
-    parser.add_argument('--max_iterations', type=int, default=100000, metavar='max_iterations',
+    parser.add_argument('--max_EM_steps', type=int, default=100000, metavar='max_iterations',
                         help='maximum number of iterations')
     parser.add_argument('--convergence_threshold', type=float, default=1e-4, metavar='convergence_threshold',
                         help='convergence threshold')

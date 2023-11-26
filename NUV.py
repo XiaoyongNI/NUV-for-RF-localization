@@ -23,16 +23,16 @@ def NUV_SSR(args, A, y, r, m):
    A_H = A.conj().T
    n = args.n
    l = args.l
-   max_iterations = args.max_iterations
+   max_EM_steps = args.max_EM_steps
    convergence_threshold = args.convergence_threshold
 
    ### 1. Initial Guess ###
    q = args.q_init * torch.ones(2, m, dtype=torch.cfloat, device=A.device)
 
    ### 2. EM Algorithm ###
-   iterations = max_iterations  
+   iterations = max_EM_steps  
 
-   for it in range(max_iterations):
+   for it in range(max_EM_steps):
       # 2a. Precision Matrix
       q[0] = q[1]
    
@@ -62,7 +62,7 @@ def NUV_SSR_batched(args, A, A_H, y, r):
    m = args.m
    n = args.n
    l = args.l
-   max_iterations = args.max_iterations
+   max_EM_steps = args.max_EM_steps  
    convergence_threshold = args.convergence_threshold
 
    samples_run = args.sample
@@ -75,9 +75,9 @@ def NUV_SSR_batched(args, A, A_H, y, r):
    q = args.q_init * torch.ones(samples_run, 2, m, dtype=torch.cfloat, device=A.device)
 
    # 2. EM Algorithm
-   iterations = max_iterations
+   iterations = max_EM_steps  
 
-   for it in range(max_iterations):
+   for it in range(max_EM_steps):
       q[:, 0, :] = q[:, 1, :]
       
       diag_squared_q = torch.diag_embed(torch.square(q[:, 0, :]), offset=0, dim1=-2, dim2=-1)
@@ -113,7 +113,7 @@ def NUV_DoA(args, center_num, A, A_H, y,  r):
    n = args.n
    l = args.l
    middle_index = int(args.m_SF / 2)
-   max_iterations = args.max_iterations
+   max_EM_steps = args.max_EM_steps
    convergence_threshold = args.convergence_threshold
 
    id = torch.eye(n, dtype=torch.cfloat, device=A.device)   
@@ -124,9 +124,9 @@ def NUV_DoA(args, center_num, A, A_H, y,  r):
    q = args.q_init * torch.ones(center_num, 2, m, dtype=torch.cfloat, device=A.device)
 
    # 2. EM Algorithm
-   iterations = max_iterations
+   iterations = max_EM_steps
 
-   for it in range(max_iterations):
+   for it in range(max_EM_steps):
       q[:, 0, :] = q[:, 1, :]
       
       diag_squared_q = torch.diag_embed(torch.square(q[:, 0, :]), offset=0, dim1=-2, dim2=-1)

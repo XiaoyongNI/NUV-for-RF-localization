@@ -176,15 +176,16 @@ class DataGenerator:
         x_true = self.nonco_signal_generator()
         
         y_train = torch.zeros(self.args.sample, self.args.l, self.args.n, 1, dtype=torch.cfloat, device=self.device)
+        y_noiseless = torch.zeros(self.args.sample, self.args.l, self.args.n, 1, dtype=torch.cfloat, device=self.device)
         
         for j in range(self.args.sample):
             for t in range(self.args.l):
                 er1 = torch.normal(mean=0.0, std=torch.sqrt(self.r2 / 2), size=(self.args.n,)).to(self.device)
                 er2 = torch.normal(mean=0.0, std=torch.sqrt(self.r2 / 2), size=(self.args.n,)).to(self.device)
-
-                y_train[j, t, :, 0] = STM_A[j].matmul(x_true[j, t, :, 0]) + er1 + er2 * 1j
+                y_noiseless[j, t, :, 0] = STM_A[j].matmul(x_true[j, t, :, 0])
+                y_train[j, t, :, 0] = y_noiseless[j, t, :, 0] + er1 + er2 * 1j
                 
-        return gt_positions, x_true, y_train
+        return gt_positions, x_true, y_train, y_noiseless
     
     def generate_experiment_data_xy(self):
         """Experiment data generation."""
