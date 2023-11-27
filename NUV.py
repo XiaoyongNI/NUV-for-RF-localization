@@ -7,7 +7,7 @@ def NUV_SSR(args, A, y, r, m):
 
    1. quantize the signal range into m equidistant grid cells
 
-   2. apply EM to estimate to posteriori distribution of decision vector q (size m)
+   2. apply EM to estimate to posteriori distribution of decision vector x (size m)
       i.e. mean and variance
 
    input:

@@ -217,13 +217,13 @@ def batch_convert_to_doa(peak_indices, m):
 # Convert from indices to 2D positions
 def convert_to_positions(peak_indices, x1_positions, x2_positions):
   """
-  input: peak_indices, array of size [k, 2], (x1, x2)
+  input: peak_indices, array of size [k, 1], (sample_id, x1, x2)
           x1_positions, tensor of size [m_r or m_x]
           theta_positions, tensor of size [m_theta or m_y] 
   output: positions, tensor of size [k, 2]
   """
-  pred_x1 = x1_positions[peak_indices[:, 0]]
-  pred_x2 = x2_positions[peak_indices[:, 1]]
+  pred_x1 = x1_positions[peak_indices[:, 1]]
+  pred_x2 = x2_positions[peak_indices[:, 2]]
   pred_x1 = pred_x1.unsqueeze(1)
   pred_x2 = pred_x2.unsqueeze(1)
   positions = torch.cat((pred_x1, pred_x2), dim=1)

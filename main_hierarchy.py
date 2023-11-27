@@ -158,7 +158,7 @@ peak_indices_iter2 = utils.batch_peak_finding_2D(x_pred_2D_iter2, args.k)
 
 # convert to positions [sample, k, 2]
 for i in range(samples_run):
-    pred_positions_iter2[i] = utils.convert_to_positions(peak_indices_iter2[i], r_positions_iter2[i], theta_positions_iter2[i])
+    pred_positions_iter2[i] = utils.convert_to_positions(peak_indices_iter2[i], torch.squeeze(r_positions_iter2[i]), theta_positions_iter2[i])
 
 end = time.time()
 t_iter2 = end - start
@@ -213,11 +213,11 @@ scipy.io.savemat(data_folder+matlab_file_name,
         'y_noiseless': y_noiseless_np,
 
         'gt_positions_rtheta': gt_positions_rtheta_np, 
-        'pred_positions_rtheta_iter1': pred_positions_rtheta_iter1_np, 
+        'pred_positions_rtheta': pred_positions_rtheta_iter1_np, 
         'pred_positions_rtheta_iter2': pred_positions_rtheta_iter2_np, 
         
-        'r_positions_iter1': r_positions_iter1,
-        'theta_positions_iter1': theta_positions_iter1,
+        'r_positions': r_positions_iter1,
+        'theta_positions': theta_positions_iter1,
         'r_positions_iter2': r_positions_iter2,
         'theta_positions_iter2': theta_positions_iter2,
 
