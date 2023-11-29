@@ -21,7 +21,8 @@ def general_settings():
     parser.add_argument('--m_y', type=int, default=3, metavar='m_y',
                         help='number of grids in y')
 
-
+    parser.add_argument('--coherent_source', type=bool, default=True, metavar='coherent',
+                        help='if True, use coherent source')
     parser.add_argument('--x_var', type=float, default=0.5, metavar='x_var',
                         help='variance of source signals')
     parser.add_argument('--mean_c', type=float, default=2, metavar='mean_c',

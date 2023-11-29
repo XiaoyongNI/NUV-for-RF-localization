@@ -112,8 +112,8 @@ class DataGenerator:
             ULA_array_batch = ULA_array.unsqueeze(0).repeat(self.args.sample, 1, 1)
             # compute distances from each source to each ULA element
             distances = torch.sqrt(torch.pow(source[:, :, 0] - ULA_array_batch[:, :, 0], 2) + torch.pow(source[:, :, 1] - ULA_array_batch[:, :, 1], 2))
-            # # compute relative distances from the first ULA element
-            # distances = distances - distances[:, 0].unsqueeze(1).repeat(1, self.args.n)
+            # compute relative distances from the first ULA element
+            distances = distances - distances[:, 0].unsqueeze(1).repeat(1, self.args.n)
             # compute phase shifts
             phase_shifts = distances * 2 * math.pi / self.args.wave_length
             # compute steering matrix
@@ -135,8 +135,8 @@ class DataGenerator:
             ULA_array_batch = ULA_array.unsqueeze(0).repeat(self.args.sample, 1, 1)
             # compute distances from each source to each ULA element (polar coordinates)
             distances = polar_distance(source[:, :, 0], source[:, :, 1], ULA_array_batch[:, :, 0], ULA_array_batch[:, :, 1])
-            # # compute relative distances from the first ULA element
-            # distances = distances - distances[:, 0].unsqueeze(1).repeat(1, self.args.n)
+            # compute relative distances from the first ULA element
+            distances = distances - distances[:, 0].unsqueeze(1).repeat(1, self.args.n)
             # compute phase shifts
             phase_shifts = distances * 2 * math.pi / self.args.wave_length
             # compute steering matrix
@@ -163,7 +163,11 @@ class DataGenerator:
         x = x + self.args.mean_c
         
         return x
-
+    
+    def co_signal_generator(self):
+        """Generates coherent source signals."""
+        return self.args.mean_c 
+        
     def generate_experiment_data_rtheta(self):
         """Experiment data generation."""
         if self.args.on_grid:
@@ -172,8 +176,11 @@ class DataGenerator:
             gt_positions = self.position_generator_rtheta()
         
         STM_A = self.obs_steeringmatrix_rtheta(gt_positions, self.ULA_array_rtheta())
-
-        x_true = self.nonco_signal_generator()
+        
+        if self.args.coherent_source:
+            x_true = self.co_signal_generator()
+        else:
+            x_true = self.nonco_signal_generator()
         
         y_train = torch.zeros(self.args.sample, self.args.l, self.args.n, 1, dtype=torch.cfloat, device=self.device)
         y_noiseless = torch.zeros(self.args.sample, self.args.l, self.args.n, 1, dtype=torch.cfloat, device=self.device)
@@ -182,7 +189,10 @@ class DataGenerator:
             for t in range(self.args.l):
                 er1 = torch.normal(mean=0.0, std=torch.sqrt(self.r2 / 2), size=(self.args.n,)).to(self.device)
                 er2 = torch.normal(mean=0.0, std=torch.sqrt(self.r2 / 2), size=(self.args.n,)).to(self.device)
-                y_noiseless[j, t, :, 0] = STM_A[j].matmul(x_true[j, t, :, 0])
+                if self.args.coherent_source:
+                    y_noiseless[j, t] = x_true * STM_A[j]
+                else:
+                    y_noiseless[j, t, :, 0] =  STM_A[j].matmul(x_true[j, t, :, 0])
                 y_train[j, t, :, 0] = y_noiseless[j, t, :, 0] + er1 + er2 * 1j
                 
         return gt_positions, x_true, y_train, y_noiseless
@@ -196,16 +206,23 @@ class DataGenerator:
         
         STM_A = self.obs_steeringmatrix_xy(gt_positions, self.ULA_array_xy())
 
-        x_true = self.nonco_signal_generator()
+        if self.args.coherent_source:
+            x_true = self.co_signal_generator()
+        else:
+            x_true = self.nonco_signal_generator()
         
         y_train = torch.zeros(self.args.sample, self.args.l, self.args.n, 1, dtype=torch.cfloat, device=self.device)
-        
+        y_noiseless = torch.zeros(self.args.sample, self.args.l, self.args.n, 1, dtype=torch.cfloat, device=self.device)
+
         for j in range(self.args.sample):
             for t in range(self.args.l):
                 er1 = torch.normal(mean=0.0, std=torch.sqrt(self.r2 / 2), size=(self.args.n,)).to(self.device)
                 er2 = torch.normal(mean=0.0, std=torch.sqrt(self.r2 / 2), size=(self.args.n,)).to(self.device)
-
-                y_train[j, t, :, 0] = STM_A[j].matmul(x_true[j, t, :, 0]) + er1 + er2 * 1j
+                if self.args.coherent_source:   
+                    y_noiseless[j, t, :, 0] = x_true * STM_A[j]
+                else:
+                    y_noiseless[j, t, :, 0] =  STM_A[j].matmul(x_true[j, t, :, 0])
+                y_train[j, t, :, 0] = y_noiseless[j, t, :, 0] + er1 + er2 * 1j
                 
         return gt_positions, x_true, y_train
     
@@ -240,8 +257,8 @@ class DataGenerator:
         position_pairs_batch = position_pairs.unsqueeze(1).repeat(1, self.args.n, 1)
         # compute distances from each hypothesis source to each ULA element (polar coordinates)
         distances = polar_distance(position_pairs_batch[:, :, 0], position_pairs_batch[:, :, 1], ULA_array_batch[:, :, 0], ULA_array_batch[:, :, 1])
-        # # compute relative distances from the first ULA element
-        # distances = distances - distances[:, 0].unsqueeze(1).repeat(1, self.args.n)
+        # compute relative distances from the first ULA element
+        distances = distances - distances[:, 0].unsqueeze(1).repeat(1, self.args.n)
         # compute phase shifts
         phase_shifts = distances * 2 * math.pi / self.args.wave_length
         # compute steering matrix
@@ -275,8 +292,8 @@ class DataGenerator:
         position_pairs_batch = position_pairs.unsqueeze(1).repeat(1, self.args.n, 1)
         # compute distances from each hypothesis source to each ULA element
         distances = torch.sqrt(torch.pow(position_pairs_batch[:, :, 0] - ULA_array_batch[:, :, 0], 2) + torch.pow(position_pairs_batch[:, :, 1] - ULA_array_batch[:, :, 1], 2))
-        # # compute relative distances from the first ULA element
-        # distances = distances - distances[:, 0].unsqueeze(1).repeat(1, self.args.n)
+        # compute relative distances from the first ULA element
+        distances = distances - distances[:, 0].unsqueeze(1).repeat(1, self.args.n)
         # compute phase shifts
         phase_shifts = distances * 2 * math.pi / self.args.wave_length
         # compute steering matrix

@@ -34,7 +34,6 @@ args.m_r = 10
 args.m_theta = 91
 m = args.m_r * args.m_theta # total num of hypotheses
 args.convergence_threshold = 4e-4
-next_iter_std_mult = 3
 
 # dataset settings
 args.sample = 2 # number of samples
@@ -54,6 +53,15 @@ torch.save([gt_positions, x_true, y_train, y_noiseless], data_folder+data_file_n
 # generate dictionary matrix A_dic, and corresponding hypothesis positions (r, theta)
 A_dic, r_positions, theta_positions = generator_iter1.dictionary_matrix_rtheta() 
 y_mean = y_train.mean(dim=1) # generate y_mean by averaging l snapshots for each sample
+
+####################################################
+y_train_np = y_train.cpu().numpy()
+y_noiseless_np = y_noiseless.cpu().numpy()
+
+scipy.io.savemat(data_folder+matlab_file_name, 
+        {'y_train': y_train_np,
+        'y_noiseless': y_noiseless_np})
+####################################################
 
 #### estimation ####
 print('======================================')
@@ -108,14 +116,21 @@ print('averaged RMSE r = {} [m]'.format(RMSE_r))
 print('averaged RMSE theta = {} [deg]'.format(RMSE_theta))
 # Print Run Time
 print("Total Run Time:", t_iter1)
-SNR = 10*math.log10((args.x_var + args.mean_c) / args.r2)
+if args.coherent_source:
+    SNR = 10*math.log10((args.mean_c) / args.r2)
+else:
+    SNR = 10*math.log10((args.x_var + args.mean_c) / args.r2)
 print('SNR = {} [dB]'.format(SNR))
 
 
 ##########################################################################################
 ### iteration 2 ###
-
 # Tuning parameters for iteration 2
+args.m_r = 101
+args.m_theta = 1
+m = args.m_r * args.m_theta # total num of hypotheses
+next_iter_std_mult_r = 3
+next_iter_std_mult_theta = 0
 
 print('======================================')
 # Tuning parameter
@@ -123,7 +138,8 @@ print('Tuning parameter (iteration2):')
 print('r_tuning = {}'.format(r_tuning))
 print('convergence_threshold = {}'.format(args.convergence_threshold))
 # Dataset
-print('new search area: pred +/- {} * RMSE'.format(next_iter_std_mult))
+print('new search area: pred R +/- {} * RMSE_R'.format(next_iter_std_mult_r))
+print('new search area: pred theta +/- {} * RMSE_theta'.format(next_iter_std_mult_theta))
 print('# sample points of r = {}'.format(args.m_r))
 print('# sample points of theta = {}'.format(args.m_theta))
 
@@ -138,10 +154,10 @@ pred_positions_iter2 = torch.zeros(samples_run, args.k, 2, dtype=torch.float, de
 for i in range(samples_run):
     ### New dictionaries ###
     # New search area
-    args.position_gt_rleft_bound = pred_positions[i,0,0] - next_iter_std_mult * RMSE_r
-    args.position_gt_rright_bound = pred_positions[i,0,0] + next_iter_std_mult * RMSE_r
-    args.position_gt_thetaleft_bound = pred_positions[i,0,1]*180/math.pi - next_iter_std_mult * RMSE_theta # degree
-    args.position_gt_thetaright_bound = pred_positions[i,0,1]*180/math.pi + next_iter_std_mult * RMSE_theta # degree  
+    args.position_gt_rleft_bound = pred_positions[i,0,0] - next_iter_std_mult_r * RMSE_r
+    args.position_gt_rright_bound = pred_positions[i,0,0] + next_iter_std_mult_r * RMSE_r
+    args.position_gt_thetaleft_bound = pred_positions[i,0,1]*180/math.pi - next_iter_std_mult_theta * RMSE_theta # degree
+    args.position_gt_thetaright_bound = pred_positions[i,0,1]*180/math.pi + next_iter_std_mult_theta * RMSE_theta # degree  
     # Generate new dictionary matrix A_dic, and corresponding hypothesis positions (r, theta)   
     generator_iter2 = DataGenerator(args)
     A_dic, r_positions_iter2[i], theta_positions_iter2[i] = generator_iter2.dictionary_matrix_rtheta()
@@ -158,7 +174,7 @@ peak_indices_iter2 = utils.batch_peak_finding_2D(x_pred_2D_iter2, args.k)
 
 # convert to positions [sample, k, 2]
 for i in range(samples_run):
-    pred_positions_iter2[i] = utils.convert_to_positions(peak_indices_iter2[i], torch.squeeze(r_positions_iter2[i]), theta_positions_iter2[i])
+    pred_positions_iter2[i] = utils.convert_to_positions(peak_indices_iter2[i], r_positions_iter2[i], theta_positions_iter2[i])
 
 end = time.time()
 t_iter2 = end - start
