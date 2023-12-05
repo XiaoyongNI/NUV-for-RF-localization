@@ -383,3 +383,46 @@ def RMSE_AxisWise_error(squared_diffs):
   mean_RMSE_axis2 = torch.mean(RMSE_axis2)
 
   return mean_RMSE_axis1, mean_RMSE_axis2
+
+###################
+### Grid Search ###
+###################
+def match_hypothesis(A_dic, y_mean):
+  """
+  Match the hypothesis with the smallest circular distance to the mean observation.
+  :param A_dic: Dictionary matrix nxm
+  :param y_mean: Mean observation nx1
+  :return: Index of the hypothesis with the smallest circular distance to the mean observation
+  """
+  # Calculate the phase of the complex numbers in the dictionary and the observation
+  A_dic_phase = torch.angle(A_dic)
+  y_mean_phase = torch.angle(y_mean)
+
+  # Initialize a tensor to store the distances for each hypothesis
+  distances = torch.zeros(A_dic.shape[1])
+
+  # Compute the circular distance for each hypothesis
+  for i in range(A_dic.shape[1]):
+    # Circular distance = minimum of the absolute distance and 2π minus the absolute distance
+    phase_diff = torch.abs(A_dic_phase[:, i] - y_mean_phase[:,0])
+    circular_distance = torch.minimum(phase_diff, 2 * torch.pi - phase_diff)
+
+    # Sum the circular distances for this hypothesis
+    distances[i] = circular_distance.sum()
+
+  # Find the hypothesis with the smallest total distance
+  min_distance_index = torch.argmin(distances)
+
+  return min_distance_index.item(), distances
+
+def get_hypothesis_position(min_distance_index, r_positions, theta_positions):
+  # Find the (r, theta) pair corresponding to min_distance_index
+  m_theta = len(theta_positions)
+  r_index = min_distance_index // m_theta
+  theta_index = min_distance_index % m_theta
+
+  # Get the r and theta values at these indices
+  r_value = r_positions[r_index].item()
+  theta_value = theta_positions[theta_index].item()
+
+  return r_value, theta_value

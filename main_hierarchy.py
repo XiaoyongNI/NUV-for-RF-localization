@@ -54,14 +54,6 @@ torch.save([gt_positions, x_true, y_train, y_noiseless], data_folder+data_file_n
 A_dic, r_positions, theta_positions = generator_iter1.dictionary_matrix_rtheta() 
 y_mean = y_train.mean(dim=1) # generate y_mean by averaging l snapshots for each sample
 
-####################################################
-y_train_np = y_train.cpu().numpy()
-y_noiseless_np = y_noiseless.cpu().numpy()
-
-scipy.io.savemat(data_folder+matlab_file_name, 
-        {'y_train': y_train_np,
-        'y_noiseless': y_noiseless_np})
-####################################################
 
 #### estimation ####
 print('======================================')
