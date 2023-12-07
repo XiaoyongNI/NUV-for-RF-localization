@@ -24,13 +24,14 @@ else:
 # path names
 plot_folder = 'simulations/plots/'
 data_folder = 'data/'
-data_file_name = 'data_polar_default.pt'
+data_file_name = 'data_polar_n32.pt'
 matlab_file_name = 'result_polar_gridsearch1.mat'
 
 # Tuning parameters
-args.m_r = 101
+args.m_r = 10
 args.m_theta = 91
 m = args.m_r * args.m_theta # total num of hypotheses
+args.n = 32
 
 # dataset settings
 args.sample = 10 # number of samples
@@ -55,28 +56,33 @@ y_mean = y_train.mean(dim=1) # generate y_mean by averaging l snapshots for each
 #### estimation ####
 print('======================================')
 # Dataset
+print('# antennas = {}'.format(args.n))
 print('r range = [{}, {}]'.format(args.position_gt_rleft_bound, args.position_gt_rright_bound))
 print('theta range = [{}, {}] deg'.format(args.position_gt_thetaleft_bound, args.position_gt_thetaright_bound))
 print('# sample points of r = {}'.format(args.m_r))
-print('r positions = {}'.format(r_positions))
 print('# sample points of theta = {}'.format(args.m_theta))
 
-start = time.time()
 # initialize
 pred_positions = torch.zeros(samples_run, args.k, 2, dtype=torch.float32, device=device)
 distances = torch.zeros(samples_run, m, dtype=torch.float32, device=device)
+min_distance_index = torch.zeros(samples_run, dtype=torch.int32, device=device)
+
+start = time.time()
 
 for i in range(samples_run):
-   print('sample {}/{}'.format(i+1, samples_run))
+#    print('sample {}/{}'.format(i+1, samples_run))
    # match hypothesis
-   min_distance_index, distances[i] = utils.match_hypothesis(A_dic, y_mean[i])
-   # get hypothesis position
-   r_value, theta_value = utils.get_hypothesis_position(min_distance_index, r_positions, theta_positions)
-   pred_positions[i, 0, :] = torch.tensor([r_value, theta_value], dtype=torch.float32, device=device)
-   print('matched position = [{}, {}], gt position = [{}, {}]'.format(r_value, theta_value, gt_positions[i, 0, 0], gt_positions[i, 0, 1]))
-
+   min_distance_index[i], distances[i] = utils.match_hypothesis(A_dic, y_mean[i])
+   
 end = time.time()
 t_GridSearch = end - start
+t_GridSearch_persample = t_GridSearch / samples_run
+
+for i in range(samples_run):
+   # get hypothesis position
+   r_value, theta_value = utils.get_hypothesis_position(min_distance_index[i], r_positions, theta_positions)
+   pred_positions[i, 0, :] = torch.tensor([r_value, theta_value], dtype=torch.float32, device=device)
+#    print('matched position = [{}, {}], gt position = [{}, {}]'.format(r_value, theta_value, gt_positions[i, 0, 0], gt_positions[i, 0, 1]))
 
 # convert to xy coordinates
 pred_positions_xy = utils.batch_polar_to_cartesian(pred_positions)
@@ -94,7 +100,7 @@ print('averaged RMSE distance = {} [m]'.format(RMSE_distance))
 print('averaged RMSE r = {} [m]'.format(RMSE_r))
 print('averaged RMSE theta = {} [deg]'.format(RMSE_theta))
 # Print Run Time
-print("Total Run Time:", t_GridSearch)
+print('Run Time/sample= {} [sec]'.format(t_GridSearch_persample))
 if args.coherent_source:
     SNR = 10*math.log10((args.mean_c) / args.r2)
 else:

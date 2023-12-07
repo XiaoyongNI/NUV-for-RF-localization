@@ -10,7 +10,7 @@ from data.data_gen import DataGenerator
 
 #### initialization ####
 args = config.general_settings()
-args.use_cuda = False
+args.use_cuda = True
 # GPU or CPU
 if args.use_cuda:
    if torch.cuda.is_available():
@@ -24,19 +24,20 @@ else:
 # path names
 plot_folder = 'simulations/plots/'
 data_folder = 'data/'
-data_file_name = 'data_polar_default.pt'
+data_file_name = 'data_polar_n16_test.pt'
 matlab_file_name = 'result_polar_2iters.mat'
 
 # Tuning parameters
 args.q_init = 0.01
 r_tuning = 1
-args.m_r = 10
+args.m_r = 11
 args.m_theta = 91
 m = args.m_r * args.m_theta # total num of hypotheses
 args.convergence_threshold = 4e-4
+args.n = 16
 
 # dataset settings
-args.sample = 2 # number of samples
+args.sample = 10 # number of samples
 samples_run = args.sample
 args.on_grid = False # gt positions are on grid or not
 args.plot_grid = True # plot grid or not
@@ -62,33 +63,35 @@ print('Tuning parameter (iteration1):')
 print('r_tuning = {}'.format(r_tuning))
 print('convergence_threshold = {}'.format(args.convergence_threshold))
 # Dataset
+print('# antennas = {}'.format(args.n))
 print('r range = [{}, {}]'.format(args.position_gt_rleft_bound, args.position_gt_rright_bound))
 print('theta range = [{}, {}] deg'.format(args.position_gt_thetaleft_bound, args.position_gt_thetaright_bound))
 print('# sample points of r = {}'.format(args.m_r))
 print('# sample points of theta = {}'.format(args.m_theta))
 
-start = time.time()
 # initialize
 x_pred = torch.zeros(samples_run, m, dtype=torch.cfloat, device=device)
 EM_steps = torch.zeros(samples_run, dtype=torch.int, device=device)
 
+start = time.time()
 # NUV-SSR 
 for i in range(samples_run):
     x_pred[i], EM_steps[i] = NUV_SSR(args, A_dic, y_mean[i], r_tuning, m)   
-    print ('EM steps = {}'.format(EM_steps[i]))
-
-
+    
 # de-flatten x_pred [sample, m_r*m_theta] -> [sample, m_r, m_theta]
 x_pred_2D = utils.batch_de_flatten(x_pred, args.m_r, args.m_theta)
 
 # find peaks [sample, k, 3]
 peak_indices = utils.batch_peak_finding_2D(x_pred_2D, args.k)
+end = time.time()
+t_iter1 = end - start
+t_iter1_persample = t_iter1 / samples_run
+
+for i in range(samples_run):
+    print ('EM steps = {}'.format(EM_steps[i]))
 
 # convert to positions [sample, k, 2]
 pred_positions = utils.batch_convert_to_positions(peak_indices, r_positions, theta_positions)
-
-end = time.time()
-t_iter1 = end - start
 
 # convert to xy coordinates
 pred_positions_xy = utils.batch_polar_to_cartesian(pred_positions)
@@ -107,7 +110,7 @@ print('averaged RMSE distance = {} [m]'.format(RMSE_distance))
 print('averaged RMSE r = {} [m]'.format(RMSE_r))
 print('averaged RMSE theta = {} [deg]'.format(RMSE_theta))
 # Print Run Time
-print("Total Run Time:", t_iter1)
+print('Run Time/sample= {} [sec]'.format(t_iter1_persample))
 if args.coherent_source:
     SNR = 10*math.log10((args.mean_c) / args.r2)
 else:
@@ -118,11 +121,13 @@ print('SNR = {} [dB]'.format(SNR))
 ##########################################################################################
 ### iteration 2 ###
 # Tuning parameters for iteration 2
-args.m_r = 101
-args.m_theta = 1
+args.m_r = 11
+args.m_theta = 91
 m = args.m_r * args.m_theta # total num of hypotheses
+r_tuning = 1
+args.convergence_threshold = 1e-5
 next_iter_std_mult_r = 3
-next_iter_std_mult_theta = 0
+next_iter_std_mult_theta = 3
 
 print('======================================')
 # Tuning parameter
@@ -135,7 +140,6 @@ print('new search area: pred theta +/- {} * RMSE_theta'.format(next_iter_std_mul
 print('# sample points of r = {}'.format(args.m_r))
 print('# sample points of theta = {}'.format(args.m_theta))
 
-start = time.time()
 # Initialization
 r_positions_iter2 = torch.zeros(samples_run, args.m_r, dtype=torch.float, device=device)
 theta_positions_iter2 = torch.zeros(samples_run, args.m_theta, dtype=torch.float, device=device)
@@ -143,6 +147,7 @@ x_pred_iter2 = torch.zeros(samples_run, m, dtype=torch.cfloat, device=device)
 EM_steps_iter2 = torch.zeros(samples_run, dtype=torch.int, device=device)
 pred_positions_iter2 = torch.zeros(samples_run, args.k, 2, dtype=torch.float, device=device)
 
+start = time.time()
 for i in range(samples_run):
     ### New dictionaries ###
     # New search area
@@ -155,21 +160,20 @@ for i in range(samples_run):
     A_dic, r_positions_iter2[i], theta_positions_iter2[i] = generator_iter2.dictionary_matrix_rtheta()
     ### NUV-SSR ###
     x_pred_iter2[i], EM_steps_iter2[i] = NUV_SSR(args, A_dic, y_mean[i], r_tuning, m)
-    print ('EM steps = {}'.format(EM_steps_iter2[i]))
-
-
+    
 # de-flatten x_pred [sample, m_r*m_theta] -> [sample, m_r, m_theta]
 x_pred_2D_iter2 = utils.batch_de_flatten(x_pred_iter2, args.m_r, args.m_theta)
 
 # find peaks [sample, k, 3]
 peak_indices_iter2 = utils.batch_peak_finding_2D(x_pred_2D_iter2, args.k)
+end = time.time()
+t_iter2 = end - start
+t_iter2_persample = t_iter2 / samples_run
 
 # convert to positions [sample, k, 2]
 for i in range(samples_run):
+    print ('EM steps = {}'.format(EM_steps_iter2[i]))
     pred_positions_iter2[i] = utils.convert_to_positions(peak_indices_iter2[i], r_positions_iter2[i], theta_positions_iter2[i])
-
-end = time.time()
-t_iter2 = end - start
 
 # convert to xy coordinates
 pred_positions_xy_iter2 = utils.batch_polar_to_cartesian(pred_positions_iter2)
@@ -186,7 +190,7 @@ print('averaged RMSE distance = {} [m]'.format(RMSE_distance_iter2))
 print('averaged RMSE r = {} [m]'.format(RMSE_r_iter2))
 print('averaged RMSE theta = {} [deg]'.format(RMSE_theta_iter2))
 # Print Run Time
-print("Total Run Time:", t_iter2)
+print('Run Time/sample= {} [sec]'.format(t_iter2_persample))
 
 #######################
 ### Save for MATLAB ###
