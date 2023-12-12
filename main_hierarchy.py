@@ -146,15 +146,19 @@ theta_positions_iter2 = torch.zeros(samples_run, args.m_theta, dtype=torch.float
 x_pred_iter2 = torch.zeros(samples_run, m, dtype=torch.cfloat, device=device)
 EM_steps_iter2 = torch.zeros(samples_run, dtype=torch.int, device=device)
 pred_positions_iter2 = torch.zeros(samples_run, args.k, 2, dtype=torch.float, device=device)
+rleft_bound_iter1 = args.position_gt_rleft_bound
+rright_bound_iter1 = args.position_gt_rright_bound
+thetaleft_bound_iter1 = args.position_gt_thetaleft_bound
+thetaright_bound_iter1 = args.position_gt_thetaright_bound
 
 start = time.time()
 for i in range(samples_run):
     ### New dictionaries ###
     # New search area
-    args.position_gt_rleft_bound = pred_positions[i,0,0] - next_iter_std_mult_r * RMSE_r
-    args.position_gt_rright_bound = pred_positions[i,0,0] + next_iter_std_mult_r * RMSE_r
-    args.position_gt_thetaleft_bound = pred_positions[i,0,1]*180/math.pi - next_iter_std_mult_theta * RMSE_theta # degree
-    args.position_gt_thetaright_bound = pred_positions[i,0,1]*180/math.pi + next_iter_std_mult_theta * RMSE_theta # degree  
+    args.position_gt_rleft_bound = max(pred_positions[i, 0, 0] - next_iter_std_mult_r * RMSE_r, rleft_bound_iter1)
+    args.position_gt_rright_bound = min(pred_positions[i,0,0] + next_iter_std_mult_r * RMSE_r, rright_bound_iter1)
+    args.position_gt_thetaleft_bound = max(pred_positions[i,0,1]*180/math.pi - next_iter_std_mult_theta * RMSE_theta, thetaleft_bound_iter1) # degree
+    args.position_gt_thetaright_bound = min(pred_positions[i,0,1]*180/math.pi + next_iter_std_mult_theta * RMSE_theta, thetaright_bound_iter1) # degree  
     # Generate new dictionary matrix A_dic, and corresponding hypothesis positions (r, theta)   
     generator_iter2 = DataGenerator(args)
     A_dic, r_positions_iter2[i], theta_positions_iter2[i] = generator_iter2.dictionary_matrix_rtheta()

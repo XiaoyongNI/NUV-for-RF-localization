@@ -418,7 +418,7 @@ def match_hypothesis(A_dic, y_mean):
 def get_hypothesis_position(min_distance_index, r_positions, theta_positions):
   # Find the (r, theta) pair corresponding to min_distance_index
   m_theta = len(theta_positions)
-  r_index = min_distance_index // m_theta
+  r_index = torch.div(min_distance_index, m_theta, rounding_mode='floor')
   theta_index = min_distance_index % m_theta
 
   # Get the r and theta values at these indices
