@@ -405,6 +405,9 @@ def match_hypothesis(A_dic, y_mean):
   for i in range(A_dic.shape[1]):
     # Circular distance = minimum of the absolute distance and 2π minus the absolute distance
     phase_diff = torch.abs(A_dic_phase[:, i] - y_mean_phase[:,0])
+    # Unify to [0, 2π]
+    phase_diff = torch.remainder(phase_diff, 2 * torch.pi)
+    # Compute the circular distance
     circular_distance = torch.minimum(phase_diff, 2 * torch.pi - phase_diff)
 
     # Sum the circular distances for this hypothesis
