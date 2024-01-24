@@ -99,16 +99,20 @@ gt_positions_xy = utils.batch_polar_to_cartesian(gt_positions)
 
 # compute RMSEs
 squared_diffs_xy = utils.batched_permuted_SquareDiff_2D(pred_positions_xy, gt_positions_xy) 
-RMSE_distance = utils.RMSE_distance_error(squared_diffs_xy)
+RMSE_distance, Empirical_variance_distance = utils.RMSE_distance_error(squared_diffs_xy)
 squared_diffs_polar = utils.batched_permuted_SquareDiff_2D(pred_positions, gt_positions)
-RMSE_r, RMSE_theta = utils.RMSE_AxisWise_error(squared_diffs_polar)
+RMSE_r, RMSE_theta,Empirical_variance_r,Empirical_variance_theta = utils.RMSE_AxisWise_error(squared_diffs_polar)
 RMSE_theta = RMSE_theta * 180 / math.pi
+Empirical_variance_theta = Empirical_variance_theta * 180 / math.pi
 
 print('Results (iteration1):')
 print('average EM steps = {}'.format(torch.mean(EM_steps.float())))
-print('averaged RMSE distance = {} [m]'.format(RMSE_distance))
-print('averaged RMSE r = {} [m]'.format(RMSE_r))
-print('averaged RMSE theta = {} [deg]'.format(RMSE_theta))
+print('RMSE distance = {} [m]'.format(RMSE_distance))
+print('empirical variance of distance = {} [m]'.format(Empirical_variance_distance))
+print('RMSE r = {} [m]'.format(RMSE_r))
+print('empirical variance of r = {} [m]'.format(Empirical_variance_r))
+print('RMSE theta = {} [deg]'.format(RMSE_theta))
+print('empirical variance of theta = {} [deg]'.format(Empirical_variance_theta))
 # Print Run Time
 print('Run Time/sample= {} [sec]'.format(t_iter1_persample))
 if args.coherent_source:
@@ -183,16 +187,20 @@ for i in range(samples_run):
 pred_positions_xy_iter2 = utils.batch_polar_to_cartesian(pred_positions_iter2)
 # compute RMSEs
 squared_diffs_xy_iter2 = utils.batched_permuted_SquareDiff_2D(pred_positions_xy_iter2, gt_positions_xy)
-RMSE_distance_iter2 = utils.RMSE_distance_error(squared_diffs_xy_iter2)
+RMSE_distance_iter2,Empirical_variance_distance_iter2 = utils.RMSE_distance_error(squared_diffs_xy_iter2)
 squared_diffs_polar_iter2 = utils.batched_permuted_SquareDiff_2D(pred_positions_iter2, gt_positions)
-RMSE_r_iter2, RMSE_theta_iter2 = utils.RMSE_AxisWise_error(squared_diffs_polar_iter2)
+RMSE_r_iter2, RMSE_theta_iter2,Empirical_variance_r_iter2,Empirical_variance_theta_iter2 = utils.RMSE_AxisWise_error(squared_diffs_polar_iter2)
 RMSE_theta_iter2 = RMSE_theta_iter2 * 180 / math.pi
+Empirical_variance_theta_iter2 = Empirical_variance_theta_iter2 * 180 / math.pi
 
 print('Results (iteration2):')
 print('average EM steps = {}'.format(torch.mean(EM_steps_iter2.float())))
-print('averaged RMSE distance = {} [m]'.format(RMSE_distance_iter2))
-print('averaged RMSE r = {} [m]'.format(RMSE_r_iter2))
-print('averaged RMSE theta = {} [deg]'.format(RMSE_theta_iter2))
+print('RMSE distance = {} [m]'.format(RMSE_distance_iter2))
+print('empirical variance of distance = {} [m]'.format(Empirical_variance_distance_iter2))
+print('RMSE r = {} [m]'.format(RMSE_r_iter2))
+print('empirical variance of r = {} [m]'.format(Empirical_variance_r_iter2))
+print('RMSE theta = {} [deg]'.format(RMSE_theta_iter2))
+print('empirical variance of theta = {} [deg]'.format(Empirical_variance_theta_iter2))
 # Print Run Time
 print('Run Time/sample= {} [sec]'.format(t_iter2_persample))
 

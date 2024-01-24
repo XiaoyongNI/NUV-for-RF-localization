@@ -93,12 +93,15 @@ t = end - start
 
 # compute RMSEs
 squared_diffs_xy = utils.batched_permuted_SquareDiff_2D(pred_positions, gt_positions) 
-RMSE_distance = utils.RMSE_distance_error(squared_diffs_xy)
-RMSE_x, RMSE_y = utils.RMSE_AxisWise_error(squared_diffs_xy)
+RMSE_distance, Empirical_variance_distance = utils.RMSE_distance_error(squared_diffs_xy)
+RMSE_x, RMSE_y,Empirical_variance_x,Empirical_variance_y = utils.RMSE_AxisWise_error(squared_diffs_xy)
 
-print('averaged RMSE distance = {} [m]'.format(RMSE_distance))
-print('averaged RMSE x = {} [m]'.format(RMSE_x))
-print('averaged RMSE y = {} [m]'.format(RMSE_y))
+print('RMSE distance = {} [m]'.format(RMSE_distance))
+print('Empirical variance of distance = {} [m]'.format(Empirical_variance_distance))
+print('RMSE x = {} [m]'.format(RMSE_x))
+print('empirical variance of x = {} [m]'.format(Empirical_variance_x))
+print('RMSE y = {} [m]'.format(RMSE_y))
+print('empirical variance of y = {} [m]'.format(Empirical_variance_y))
 
 
 

@@ -347,7 +347,7 @@ def batched_permuted_SquareDiff_2D(pred, gt):
 def RMSE_distance_error(squared_diffs):
   """
   input: squared_diffs, tensor of size [batch_size, k!, k, 2] in cartesian coordinates
-  output: RMSE, one value
+  output: RMSE, empirical variance
   """
 
   # mean over k targets and 2 axis(x, y or r, theta)
@@ -357,16 +357,17 @@ def RMSE_distance_error(squared_diffs):
   min_mse, _ = torch.min(mse, dim=1)  # [batch_size]
 
   min_mse = min_mse * 2 # since we want distance error, no need to average over x and y or r and theta
-  RMSE_error = torch.sqrt(min_mse)
-  mean_RMSE_error = torch.mean(RMSE_error) # mean RMSE over all samples
+  
+  RMSE_error = torch.sqrt(torch.mean(min_mse)) # mean RMSE over all samples, then take square root
+  Empirical_variance = torch.sqrt(torch.mean((torch.sqrt(min_mse) - RMSE_error)**2))
 
-  return mean_RMSE_error
+  return RMSE_error, Empirical_variance
 
 def RMSE_AxisWise_error(squared_diffs):
   """
   Compute RMSE for each axis (x, y or r, theta)
   input: squared_diffs, tensor of size [batch_size, k!, k, 2]
-  output: RMSE_axis1, RMSE_axis2, two values
+  output: RMSE_axis1, RMSE_axis2, two empirical variances
   """
   # mean over k targets
   mse = torch.mean(squared_diffs, dim=2)  # [batch_size, k!, 2]
@@ -377,12 +378,13 @@ def RMSE_AxisWise_error(squared_diffs):
   min_mse_axis1, _ = torch.min(mse_axis1, dim=1)  # [batch_size]
   min_mse_axis2, _ = torch.min(mse_axis2, dim=1)  # [batch_size]
   # RMSE for each axis
-  RMSE_axis1 = torch.sqrt(min_mse_axis1)
-  RMSE_axis2 = torch.sqrt(min_mse_axis2)
-  mean_RMSE_axis1 = torch.mean(RMSE_axis1)
-  mean_RMSE_axis2 = torch.mean(RMSE_axis2)
+  RMSE_axis1 = torch.sqrt(torch.mean(min_mse_axis1))
+  RMSE_axis2 = torch.sqrt(torch.mean(min_mse_axis2))
+  # Empirical variance for each axis
+  Empirical_variance_axis1 = torch.sqrt(torch.mean((torch.sqrt(min_mse_axis1) - RMSE_axis1)**2))
+  Empirical_variance_axis2 = torch.sqrt(torch.mean((torch.sqrt(min_mse_axis2) - RMSE_axis2)**2))
 
-  return mean_RMSE_axis1, mean_RMSE_axis2
+  return RMSE_axis1, RMSE_axis2, Empirical_variance_axis1, Empirical_variance_axis2
 
 ###################
 ### Grid Search ###
