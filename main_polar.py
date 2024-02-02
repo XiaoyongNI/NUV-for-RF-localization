@@ -95,12 +95,13 @@ RMSE_r, RMSE_theta,Empirical_variance_r,Empirical_variance_theta = utils.RMSE_Ax
 RMSE_theta = RMSE_theta * 180 / math.pi
 Empirical_variance_theta = Empirical_variance_theta * 180 / math.pi
 
-print('RMSE distance = {} [m]'.format(RMSE_distance))
-print('empirical variance of distance = {} [m]'.format(Empirical_variance_distance))
+
 print('RMSE r = {} [m]'.format(RMSE_r))
 print('empirical variance of r = {} [m]'.format(Empirical_variance_r))
 print('RMSE theta = {} [deg]'.format(RMSE_theta))
 print('empirical variance of theta = {} [deg]'.format(Empirical_variance_theta))
+print('RMSE distance = {} [m]'.format(RMSE_distance))
+print('empirical variance of distance = {} [m]'.format(Empirical_variance_distance))
 
 # Print Run Time
 print("Total Run Time:", t)

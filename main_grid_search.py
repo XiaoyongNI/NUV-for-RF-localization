@@ -104,12 +104,12 @@ distances_2D = utils.batch_de_flatten(distances, args.m_r, args.m_theta)
 spectrum_2D_np = distances_2D.cpu().numpy()
 
 print('Results (grid search):')
-print('RMSE distance = {} [m]'.format(RMSE_distance))
-print('empirical variance of distance = {} [m]'.format(Empirical_variance_distance))
 print('RMSE r = {} [m]'.format(RMSE_r))
 print('empirical variance of r = {} [m]'.format(Empirical_variance_r))
 print('RMSE theta = {} [deg]'.format(RMSE_theta))
 print('empirical variance of theta = {} [deg]'.format(Empirical_variance_theta))
+print('RMSE distance = {} [m]'.format(RMSE_distance))
+print('empirical variance of distance = {} [m]'.format(Empirical_variance_distance))
 
 # Print Run Time
 print('Run Time/sample= {} [sec]'.format(t_GridSearch_persample))

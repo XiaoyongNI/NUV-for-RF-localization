@@ -107,12 +107,12 @@ Empirical_variance_theta = Empirical_variance_theta * 180 / math.pi
 
 print('Results (iteration1):')
 print('average EM steps = {}'.format(torch.mean(EM_steps.float())))
-print('RMSE distance = {} [m]'.format(RMSE_distance))
-print('empirical variance of distance = {} [m]'.format(Empirical_variance_distance))
 print('RMSE r = {} [m]'.format(RMSE_r))
 print('empirical variance of r = {} [m]'.format(Empirical_variance_r))
 print('RMSE theta = {} [deg]'.format(RMSE_theta))
 print('empirical variance of theta = {} [deg]'.format(Empirical_variance_theta))
+print('RMSE distance = {} [m]'.format(RMSE_distance))
+print('empirical variance of distance = {} [m]'.format(Empirical_variance_distance))
 # Print Run Time
 print('Run Time/sample= {} [sec]'.format(t_iter1_persample))
 if args.coherent_source:
@@ -195,12 +195,12 @@ Empirical_variance_theta_iter2 = Empirical_variance_theta_iter2 * 180 / math.pi
 
 print('Results (iteration2):')
 print('average EM steps = {}'.format(torch.mean(EM_steps_iter2.float())))
-print('RMSE distance = {} [m]'.format(RMSE_distance_iter2))
-print('empirical variance of distance = {} [m]'.format(Empirical_variance_distance_iter2))
 print('RMSE r = {} [m]'.format(RMSE_r_iter2))
 print('empirical variance of r = {} [m]'.format(Empirical_variance_r_iter2))
 print('RMSE theta = {} [deg]'.format(RMSE_theta_iter2))
 print('empirical variance of theta = {} [deg]'.format(Empirical_variance_theta_iter2))
+print('RMSE distance = {} [m]'.format(RMSE_distance_iter2))
+print('empirical variance of distance = {} [m]'.format(Empirical_variance_distance_iter2))
 # Print Run Time
 print('Run Time/sample= {} [sec]'.format(t_iter2_persample))
 
