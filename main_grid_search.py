@@ -3,7 +3,6 @@ import math
 import time
 import scipy.io
 
-from NUV import NUV_SSR
 from simulations import utils
 from simulations import config
 from data.data_gen import DataGenerator
@@ -24,17 +23,18 @@ else:
 # path names
 plot_folder = 'simulations/plots/'
 data_folder = 'data/'
-data_file_name = 'data_polar_n16_test.pt'
-matlab_file_name = 'result_polar_gridsearch1.mat'
+data_file_name = 'data_polar_n64_test.pt'
+matlab_file_name = 'result_polar_n64test_gridsearch3iters1001x91.mat'
 
 # Tuning parameters
-args.m_r = 11 # number of sample points of r
+args.m_r = 1001 # number of sample points of r
 args.m_theta = 91 # number of sample points of theta
 m = args.m_r * args.m_theta # total num of hypotheses
-args.n = 16 # number of antennas
+args.n = 64 # number of antennas
 
 # dataset settings
 args.sample = 100 # number of samples
+args.r2 = 1 # noise variance
 samples_run = args.sample
 args.on_grid = False # gt positions are on grid or not
 args.position_gt_rleft_bound = 500
@@ -73,8 +73,7 @@ min_distance_index = torch.zeros(samples_run, dtype=torch.int32, device=device)
 start = time.time()
 
 for i in range(samples_run):
-#    print('sample {}/{}'.format(i+1, samples_run))
-   # match hypothesis
+   # Grid search
    min_distance_index[i], distances[i] = utils.match_hypothesis(A_dic, y_mean[i])
    
 end = time.time()
@@ -123,7 +122,7 @@ print('SNR = {} [dB]'.format(SNR))
 ##########################################################################################
 ### iteration 2 ###
 # Tuning parameters for iteration 2
-args.m_r = 11
+args.m_r = 1001
 args.m_theta = 91
 m = args.m_r * args.m_theta # total num of hypotheses
 next_iter_std_mult_r = 3
@@ -180,12 +179,12 @@ RMSE_theta_iter2 = RMSE_theta_iter2 * 180 / math.pi
 Empirical_variance_theta_iter2 = Empirical_variance_theta_iter2 * 180 / math.pi
 
 print('Results (grid search iteration2):')
-print('RMSE distance = {} [m]'.format(RMSE_distance_iter2))
-print('empirical variance of distance = {} [m]'.format(Empirical_variance_distance_iter2))
 print('RMSE r = {} [m]'.format(RMSE_r_iter2))
 print('empirical variance of r = {} [m]'.format(Empirical_variance_r_iter2))
 print('RMSE theta = {} [deg]'.format(RMSE_theta_iter2))
 print('empirical variance of theta = {} [deg]'.format(Empirical_variance_theta_iter2))
+print('RMSE distance = {} [m]'.format(RMSE_distance_iter2))
+print('empirical variance of distance = {} [m]'.format(Empirical_variance_distance_iter2))
 
 # Print Run Time
 print('Run Time/sample= {} [sec]'.format(t_GridSearch_persample_iter2))
@@ -195,7 +194,7 @@ print('Run Time/sample= {} [sec]'.format(t_GridSearch_persample_iter2))
 ##########################################################################################
 ### iteration 3 ###
 # Tuning parameters for iteration 3
-args.m_r = 11
+args.m_r = 1001
 args.m_theta = 91
 m = args.m_r * args.m_theta # total num of hypotheses
 next_iter_std_mult_r = 3
@@ -251,12 +250,12 @@ RMSE_theta_iter3 = RMSE_theta_iter3 * 180 / math.pi
 Empirical_variance_theta_iter3 = Empirical_variance_theta_iter3 * 180 / math.pi
 
 print('Results (grid search iteration3):')
-print('RMSE distance = {} [m]'.format(RMSE_distance_iter3))
-print('empirical variance of distance = {} [m]'.format(Empirical_variance_distance_iter3))
 print('RMSE r = {} [m]'.format(RMSE_r_iter3))
 print('empirical variance of r = {} [m]'.format(Empirical_variance_r_iter3))
 print('RMSE theta = {} [deg]'.format(RMSE_theta_iter3))
 print('empirical variance of theta = {} [deg]'.format(Empirical_variance_theta_iter3))
+print('RMSE distance = {} [m]'.format(RMSE_distance_iter3))
+print('empirical variance of distance = {} [m]'.format(Empirical_variance_distance_iter3))
 # Print Run Time
 print('Run Time/sample= {} [sec]'.format(t_GridSearch_persample_iter3))
 
@@ -265,47 +264,63 @@ print('Run Time/sample= {} [sec]'.format(t_GridSearch_persample_iter3))
 ### Save for MATLAB ###
 #######################
 # Save in a .mat file
-# y_train_np = y_train.cpu().numpy()
-# y_noiseless_np = y_noiseless.cpu().numpy()
+y_train_np = y_train.cpu().numpy()
+y_noiseless_np = y_noiseless.cpu().numpy()
 
-# gt_positions_rtheta_np = gt_positions.cpu().numpy()
-# pred_positions_rtheta_np = pred_positions.cpu().numpy()
-# pred_positions_rtheta_np_iter2 = pred_positions_iter2.cpu().numpy()
+gt_positions_rtheta_np = gt_positions.cpu().numpy()
+pred_positions_rtheta_np = pred_positions.cpu().numpy()
+pred_positions_rtheta_np_iter2 = pred_positions_iter2.cpu().numpy()
+pred_positions_rtheta_np_iter3 = pred_positions_iter3.cpu().numpy()
 
-# r_positions = r_positions.cpu().numpy()
-# theta_positions = theta_positions.cpu().numpy()
-# r_positions_iter2 = r_positions_iter2.cpu().numpy()
-# theta_positions_iter2 = theta_positions_iter2.cpu().numpy()
+r_positions = r_positions.cpu().numpy()
+theta_positions = theta_positions.cpu().numpy()
+r_positions_iter2 = r_positions_iter2.cpu().numpy()
+theta_positions_iter2 = theta_positions_iter2.cpu().numpy()
+r_positions_iter3 = r_positions_iter3.cpu().numpy()
+theta_positions_iter3 = theta_positions_iter3.cpu().numpy()
 
-# distances_iter2_2D = utils.batch_de_flatten(distances_iter2, args.m_r, args.m_theta)
-# spectrum_2D_np_iter2 = distances_iter2_2D.cpu().numpy()
-# RMSE_distance = RMSE_distance.cpu().numpy()
-# RMSE_distance_iter2 = RMSE_distance_iter2.cpu().numpy()
-# RMSE_r = RMSE_r.cpu().numpy()
-# RMSE_r_iter2 = RMSE_r_iter2.cpu().numpy()
-# RMSE_theta = RMSE_theta.cpu().numpy()
-# RMSE_theta_iter2 = RMSE_theta_iter2.cpu().numpy()
+distances_iter2_2D = utils.batch_de_flatten(distances_iter2, args.m_r, args.m_theta)
+spectrum_2D_np_iter2 = distances_iter2_2D.cpu().numpy()
+distances_iter3_2D = utils.batch_de_flatten(distances_iter3, args.m_r, args.m_theta)
+spectrum_2D_np_iter3 = distances_iter3_2D.cpu().numpy()
 
-# scipy.io.savemat(data_folder+matlab_file_name, 
-#                  {'gt_positions_rtheta': gt_positions_rtheta_np, 
-#                   'pred_positions_rtheta': pred_positions_rtheta_np, 
-#                   'pred_positions_rtheta_iter2': pred_positions_rtheta_np_iter2,
+RMSE_distance = RMSE_distance.cpu().numpy()
+RMSE_distance_iter2 = RMSE_distance_iter2.cpu().numpy()
+RMSE_distance_iter3 = RMSE_distance_iter3.cpu().numpy()
+RMSE_r = RMSE_r.cpu().numpy()
+RMSE_r_iter2 = RMSE_r_iter2.cpu().numpy()
+RMSE_r_iter3 = RMSE_r_iter3.cpu().numpy()
+RMSE_theta = RMSE_theta.cpu().numpy()
+RMSE_theta_iter2 = RMSE_theta_iter2.cpu().numpy()
+RMSE_theta_iter3 = RMSE_theta_iter3.cpu().numpy()
 
-#                   'y_train': y_train_np,
-#                   'y_noiseless': y_noiseless_np,
+scipy.io.savemat(data_folder+matlab_file_name, 
+                 {'gt_positions_rtheta': gt_positions_rtheta_np, 
+                  'pred_positions_rtheta': pred_positions_rtheta_np, 
+                  'pred_positions_rtheta_iter2': pred_positions_rtheta_np_iter2,
+                  'pred_positions_rtheta_iter3': pred_positions_rtheta_np_iter3,
 
-#                   'spectrum_2D': spectrum_2D_np,
-#                   'spectrum_2D_iter2': spectrum_2D_np_iter2,
+                  'y_train': y_train_np,
+                  'y_noiseless': y_noiseless_np,
 
-#                   'r_positions': r_positions,
-#                   'theta_positions': theta_positions,
-#                   'r_positions_iter2': r_positions_iter2,
-#                   'theta_positions_iter2': theta_positions_iter2,
+                  'spectrum_2D': spectrum_2D_np,
+                  'spectrum_2D_iter2': spectrum_2D_np_iter2,
+                  'spectrum_2D_iter3': spectrum_2D_np_iter3,
 
-#                   'RMSE_distance': RMSE_distance,
-#                   'RMSE_distance_iter2': RMSE_distance_iter2,
-#                   'RMSE_r': RMSE_r,
-#                   'RMSE_r_iter2': RMSE_r_iter2,
-#                   'RMSE_theta': RMSE_theta,
-#                   'RMSE_theta_iter2': RMSE_theta_iter2})
+                  'r_positions': r_positions,
+                  'theta_positions': theta_positions,
+                  'r_positions_iter2': r_positions_iter2,
+                  'theta_positions_iter2': theta_positions_iter2,
+                  'r_positions_iter3': r_positions_iter3,
+                  'theta_positions_iter3': theta_positions_iter3,
+
+                  'RMSE_distance': RMSE_distance,
+                  'RMSE_distance_iter2': RMSE_distance_iter2,
+                  'RMSE_distance_iter3': RMSE_distance_iter3,
+                  'RMSE_r': RMSE_r,
+                  'RMSE_r_iter2': RMSE_r_iter2,
+                  'RMSE_r_iter3': RMSE_r_iter3,
+                  'RMSE_theta': RMSE_theta,
+                  'RMSE_theta_iter2': RMSE_theta_iter2,
+                  'RMSE_theta_iter3': RMSE_theta_iter3})
 

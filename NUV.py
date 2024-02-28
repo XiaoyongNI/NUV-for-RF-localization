@@ -47,7 +47,7 @@ def NUV_SSR(args, A, y, r, m):
       q[1] = torch.sqrt(torch.square(torch.squeeze(mean,1)) + variance)
       
       if torch.norm(q[1] - q[0]) < convergence_threshold:   # stopping criteria
-         iterations = it
+         iterations = it+1
          break
    
 

@@ -386,9 +386,19 @@ def RMSE_AxisWise_error(squared_diffs):
 
   return RMSE_axis1, RMSE_axis2, Empirical_variance_axis1, Empirical_variance_axis2
 
-###################
-### Grid Search ###
-###################
+######################################
+### Grid Search or Random Detector ###
+######################################
+
+def random_detector(A_dic):
+  """
+  Randomly select a hypothesis from the dictionary
+  :param A_dic: Dictionary matrix nxm
+  :return: Index of the randomly selected hypothesis
+  """
+  return torch.randint(A_dic.shape[1], (1,)).item()
+ 
+   
 def match_hypothesis(A_dic, y_mean):
   """
   Match the hypothesis with the smallest circular distance to the mean observation.

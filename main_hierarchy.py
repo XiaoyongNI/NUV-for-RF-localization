@@ -24,20 +24,26 @@ else:
 # path names
 plot_folder = 'simulations/plots/'
 data_folder = 'data/'
-data_file_name = 'data_polar_n16_test.pt'
-matlab_file_name = 'result_polar_2iters.mat'
+data_file_name = 'data_polar_n16_highnoise.pt'
+matlab_file_name = 'result_polar_n16highnoise_NUV2D.mat'
 
-# Tuning parameters
 args.q_init = 0.01
-r_tuning = 1
 args.m_r = 11
 args.m_theta = 91
 m = args.m_r * args.m_theta # total num of hypotheses
-args.convergence_threshold = 4e-4
-args.n = 16
+
+# Tuning parameters for low noise
+# r_tuning = 1
+# args.convergence_threshold = 4e-4
+
+# Tuning parameters for high noise
+r_tuning = 0.01
+args.convergence_threshold = 1e-1
 
 # dataset settings
-args.sample = 10 # number of samples
+args.n = 16 # number of antennas
+args.r2 = 1 # noise variance
+args.sample = 100 # number of samples
 samples_run = args.sample
 args.on_grid = False # gt positions are on grid or not
 args.plot_grid = True # plot grid or not
@@ -48,8 +54,8 @@ args.position_gt_thetaright_bound = 135
 
 #### Generate data ####
 generator_iter1 = DataGenerator(args)
-gt_positions, x_true, y_train, y_noiseless = generator_iter1.generate_experiment_data_rtheta()
-torch.save([gt_positions, x_true, y_train, y_noiseless], data_folder+data_file_name)
+# gt_positions, x_true, y_train, y_noiseless = generator_iter1.generate_experiment_data_rtheta()
+# torch.save([gt_positions, x_true, y_train, y_noiseless], data_folder+data_file_name)
 [gt_positions, x_true, y_train, y_noiseless] = torch.load(data_folder+data_file_name, map_location=device)
 # generate dictionary matrix A_dic, and corresponding hypothesis positions (r, theta)
 A_dic, r_positions, theta_positions = generator_iter1.dictionary_matrix_rtheta() 
@@ -124,14 +130,18 @@ print('SNR = {} [dB]'.format(SNR))
 
 ##########################################################################################
 ### iteration 2 ###
-# Tuning parameters for iteration 2
 args.m_r = 11
 args.m_theta = 91
 m = args.m_r * args.m_theta # total num of hypotheses
-r_tuning = 1
-args.convergence_threshold = 1e-5
 next_iter_std_mult_r = 3
 next_iter_std_mult_theta = 3
+
+# Tuning parameters for iteration 2 (low noise)
+# r_tuning = 1
+# args.convergence_threshold = 1e-5
+# Tuning parameters for iteration 2 (low noise)
+r_tuning = 100
+args.convergence_threshold = 1e-2
 
 print('======================================')
 # Tuning parameter
