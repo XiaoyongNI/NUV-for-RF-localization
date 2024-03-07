@@ -23,18 +23,20 @@ else:
 # path names
 plot_folder = 'simulations/plots/'
 data_folder = 'data/'
-data_file_name = 'data_polar_n64_test.pt'
-matlab_file_name = 'result_polar_n64test_gridsearch3iters1001x91.mat'
+data_file_name_train = 'data_polar_n16_train.pt'
+data_file_name_test = 'data_polar_n16_test.pt'
+matlab_file_name = 'result_polar_n16lownoise_gridsearch3iters11x91.mat'
 
 # Tuning parameters
-args.m_r = 1001 # number of sample points of r
+args.m_r = 11 # number of sample points of r
 args.m_theta = 91 # number of sample points of theta
 m = args.m_r * args.m_theta # total num of hypotheses
-args.n = 64 # number of antennas
+args.n = 16 # number of antennas
 
 # dataset settings
+dataset_types = ['train', 'test']
 args.sample = 100 # number of samples
-args.r2 = 1 # noise variance
+args.r2 = 1e-3 # noise variance
 samples_run = args.sample
 args.on_grid = False # gt positions are on grid or not
 args.position_gt_rleft_bound = 500
@@ -46,218 +48,246 @@ rright_bound_iter1 = args.position_gt_rright_bound
 thetaleft_bound_iter1 = args.position_gt_thetaleft_bound
 thetaright_bound_iter1 = args.position_gt_thetaright_bound
 
-#### Generate data ####
-generator_iter1 = DataGenerator(args)
-# gt_positions, x_true, y_train, y_noiseless = generator_iter1.generate_experiment_data_rtheta()
-# torch.save([gt_positions, x_true, y_train, y_noiseless], data_folder+data_file_name)
-[gt_positions, x_true, y_train, y_noiseless] = torch.load(data_folder+data_file_name, map_location=device)
-# generate dictionary matrix A_dic, and corresponding hypothesis positions (r, theta)
-A_dic, r_positions, theta_positions = generator_iter1.dictionary_matrix_rtheta() 
-y_mean = y_train.mean(dim=1) # generate y_mean by averaging l snapshots for each sample
+for dataset_type in dataset_types:
+   #### Generate data ####
+   generator_iter1 = DataGenerator(args)
+   # gt_positions, x_true, y_train, y_noiseless = generator_iter1.generate_experiment_data_rtheta()
+   if dataset_type == 'train':
+      # torch.save([gt_positions, x_true, y_train, y_noiseless], data_folder+data_file_name_train)
+      [gt_positions, x_true, y_train, y_noiseless] = torch.load(data_folder+data_file_name_train, map_location=device)
+   elif dataset_type == 'test':
+      # torch.save([gt_positions, x_true, y_train, y_noiseless], data_folder+data_file_name_test)
+      [gt_positions, x_true, y_train, y_noiseless] = torch.load(data_folder+data_file_name_test, map_location=device)
+   else:
+      raise Exception("Invalid dataset_type")
+   # generate dictionary matrix A_dic, and corresponding hypothesis positions (r, theta)
+   A_dic, r_positions, theta_positions = generator_iter1.dictionary_matrix_rtheta() 
+   y_mean = y_train.mean(dim=1) # generate y_mean by averaging l snapshots for each sample
 
 
-#### estimation ####
-print('======================================')
-# Dataset
-print('# antennas = {}'.format(args.n))
-print('r range = [{}, {}]'.format(args.position_gt_rleft_bound, args.position_gt_rright_bound))
-print('theta range = [{}, {}] deg'.format(args.position_gt_thetaleft_bound, args.position_gt_thetaright_bound))
-print('# sample points of r = {}'.format(args.m_r))
-print('# sample points of theta = {}'.format(args.m_theta))
+   #### estimation ####
+   # Dataset
+   print('======================================')
+   print('dataset type = {}'.format(dataset_type))
+   print('# antennas = {}'.format(args.n))
+   print('r range = [{}, {}]'.format(args.position_gt_rleft_bound, args.position_gt_rright_bound))
+   print('theta range = [{}, {}] deg'.format(args.position_gt_thetaleft_bound, args.position_gt_thetaright_bound))
+   print('# sample points of r = {}'.format(args.m_r))
+   print('# sample points of theta = {}'.format(args.m_theta))
 
-# initialize
-pred_positions = torch.zeros(samples_run, args.k, 2, dtype=torch.float32, device=device)
-distances = torch.zeros(samples_run, m, dtype=torch.float32, device=device)
-min_distance_index = torch.zeros(samples_run, dtype=torch.int32, device=device)
+   # initialize
+   pred_positions = torch.zeros(samples_run, args.k, 2, dtype=torch.float32, device=device)
+   distances = torch.zeros(samples_run, m, dtype=torch.float32, device=device)
+   min_distance_index = torch.zeros(samples_run, dtype=torch.int32, device=device)
 
-start = time.time()
+   start = time.time()
 
-for i in range(samples_run):
-   # Grid search
-   min_distance_index[i], distances[i] = utils.match_hypothesis(A_dic, y_mean[i])
-   
-end = time.time()
-t_GridSearch = end - start
-t_GridSearch_persample = t_GridSearch / samples_run
+   for i in range(samples_run):
+      # Grid search
+      min_distance_index[i], distances[i] = utils.match_hypothesis(A_dic, y_mean[i])
+      
+   end = time.time()
+   t_GridSearch = end - start
+   t_GridSearch_persample = t_GridSearch / samples_run
 
-for i in range(samples_run):
-   # get hypothesis position
-   r_value, theta_value = utils.get_hypothesis_position(min_distance_index[i], r_positions, theta_positions)
-   pred_positions[i, 0, :] = torch.tensor([r_value, theta_value], dtype=torch.float32, device=device)
-#    print('matched position = [{}, {}], gt position = [{}, {}]'.format(r_value, theta_value, gt_positions[i, 0, 0], gt_positions[i, 0, 1]))
+   for i in range(samples_run):
+      # get hypothesis position
+      r_value, theta_value = utils.get_hypothesis_position(min_distance_index[i], r_positions, theta_positions)
+      pred_positions[i, 0, :] = torch.tensor([r_value, theta_value], dtype=torch.float32, device=device)
+   #    print('matched position = [{}, {}], gt position = [{}, {}]'.format(r_value, theta_value, gt_positions[i, 0, 0], gt_positions[i, 0, 1]))
 
-# convert to xy coordinates
-pred_positions_xy = utils.batch_polar_to_cartesian(pred_positions)
-gt_positions_xy = utils.batch_polar_to_cartesian(gt_positions)
+   # convert to xy coordinates
+   pred_positions_xy = utils.batch_polar_to_cartesian(pred_positions)
+   gt_positions_xy = utils.batch_polar_to_cartesian(gt_positions)
 
-# compute RMSEs
-squared_diffs_xy = utils.batched_permuted_SquareDiff_2D(pred_positions_xy, gt_positions_xy) 
-RMSE_distance, Empirical_variance_distance = utils.RMSE_distance_error(squared_diffs_xy)
-squared_diffs_polar = utils.batched_permuted_SquareDiff_2D(pred_positions, gt_positions)
-RMSE_r, RMSE_theta, Empirical_variance_r, Empirical_variance_theta = utils.RMSE_AxisWise_error(squared_diffs_polar)
-RMSE_theta = RMSE_theta * 180 / math.pi
-Empirical_variance_theta = Empirical_variance_theta * 180 / math.pi
+   # compute RMSEs
+   squared_diffs_xy = utils.batched_permuted_SquareDiff_2D(pred_positions_xy, gt_positions_xy) 
+   RMSE_distance, Empirical_variance_distance = utils.RMSE_distance_error(squared_diffs_xy)
+   squared_diffs_polar = utils.batched_permuted_SquareDiff_2D(pred_positions, gt_positions)
+   RMSE_r, RMSE_theta, Empirical_variance_r, Empirical_variance_theta = utils.RMSE_AxisWise_error(squared_diffs_polar)
+   RMSE_theta = RMSE_theta * 180 / math.pi
+   Empirical_variance_theta = Empirical_variance_theta * 180 / math.pi
 
-# compute "spectrum"
-distances_2D = utils.batch_de_flatten(distances, args.m_r, args.m_theta)
-spectrum_2D_np = distances_2D.cpu().numpy()
+   # compute "spectrum"
+   distances_2D = utils.batch_de_flatten(distances, args.m_r, args.m_theta)
+   spectrum_2D_np = distances_2D.cpu().numpy()
 
-print('Results (grid search):')
-print('RMSE r = {} [m]'.format(RMSE_r))
-print('empirical variance of r = {} [m]'.format(Empirical_variance_r))
-print('RMSE theta = {} [deg]'.format(RMSE_theta))
-print('empirical variance of theta = {} [deg]'.format(Empirical_variance_theta))
-print('RMSE distance = {} [m]'.format(RMSE_distance))
-print('empirical variance of distance = {} [m]'.format(Empirical_variance_distance))
+   print('Results (grid search):')
+   print('RMSE r = {} [m]'.format(RMSE_r))
+   print('empirical variance of r = {} [m]'.format(Empirical_variance_r))
+   print('RMSE theta = {} [deg]'.format(RMSE_theta))
+   print('empirical variance of theta = {} [deg]'.format(Empirical_variance_theta))
+   print('RMSE distance = {} [m]'.format(RMSE_distance))
+   print('empirical variance of distance = {} [m]'.format(Empirical_variance_distance))
 
-# Print Run Time
-print('Run Time/sample= {} [sec]'.format(t_GridSearch_persample))
-if args.coherent_source:
-    SNR = 10*math.log10((args.mean_c) / args.r2)
-else:
-    SNR = 10*math.log10((args.x_var + args.mean_c) / args.r2)
-print('SNR = {} [dB]'.format(SNR))
+   # Print Run Time
+   print('Run Time/sample= {} [sec]'.format(t_GridSearch_persample))
+   if args.coherent_source:
+      SNR = 10*math.log10((args.mean_c) / args.r2)
+   else:
+      SNR = 10*math.log10((args.x_var + args.mean_c) / args.r2)
+   print('SNR = {} [dB]'.format(SNR))
 
+   # Save empirical RMSEs of r and theta if "train" dataset
+   if dataset_type == 'train':
+      Empirical_RMSE_r = RMSE_r
+      Empirical_RMSE_theta = RMSE_theta
 
-##########################################################################################
-### iteration 2 ###
-# Tuning parameters for iteration 2
-args.m_r = 1001
-args.m_theta = 91
-m = args.m_r * args.m_theta # total num of hypotheses
-next_iter_std_mult_r = 3
-next_iter_std_mult_theta = 3
+   ##########################################################################################
+   ### iteration 2 ###
+   # Tuning parameters for iteration 2
+   args.m_r = 101
+   args.m_theta = 91
+   m = args.m_r * args.m_theta # total num of hypotheses
+   next_iter_std_mult_r = 3
+   next_iter_std_mult_theta = 3
 
-print('======================================')
-# Dataset
-print('new search area: pred R +/- {} * RMSE_R'.format(next_iter_std_mult_r))
-print('new search area: pred theta +/- {} * RMSE_theta'.format(next_iter_std_mult_theta))
-print('# sample points of r = {}'.format(args.m_r))
-print('# sample points of theta = {}'.format(args.m_theta))
+   print('======================================')
+   # Dataset
+   print('new search area: pred R +/- {} * RMSE_R'.format(next_iter_std_mult_r))
+   print('new search area: pred theta +/- {} * RMSE_theta'.format(next_iter_std_mult_theta))
+   print('# sample points of r = {}'.format(args.m_r))
+   print('# sample points of theta = {}'.format(args.m_theta))
 
-# initialize
-pred_positions_iter2 = torch.zeros(samples_run, args.k, 2, dtype=torch.float32, device=device)
-distances_iter2 = torch.zeros(samples_run, m, dtype=torch.float32, device=device)
-min_distance_index_iter2 = torch.zeros(samples_run, dtype=torch.int32, device=device)
-r_positions_iter2 = torch.zeros(samples_run, args.m_r, dtype=torch.float, device=device)
-theta_positions_iter2 = torch.zeros(samples_run, args.m_theta, dtype=torch.float, device=device)
+   # initialize
+   pred_positions_iter2 = torch.zeros(samples_run, args.k, 2, dtype=torch.float32, device=device)
+   distances_iter2 = torch.zeros(samples_run, m, dtype=torch.float32, device=device)
+   min_distance_index_iter2 = torch.zeros(samples_run, dtype=torch.int32, device=device)
+   r_positions_iter2 = torch.zeros(samples_run, args.m_r, dtype=torch.float, device=device)
+   theta_positions_iter2 = torch.zeros(samples_run, args.m_theta, dtype=torch.float, device=device)
 
+   start = time.time()
 
-start = time.time()
+   for i in range(samples_run):
+      ### New dictionaries ###
+      # New search area
+      if dataset_type == 'train':
+         args.position_gt_rleft_bound = max(pred_positions[i, 0, 0] - next_iter_std_mult_r * RMSE_r, rleft_bound_iter1)
+         args.position_gt_rright_bound = min(pred_positions[i,0,0] + next_iter_std_mult_r * RMSE_r, rright_bound_iter1)
+         args.position_gt_thetaleft_bound = max(pred_positions[i,0,1]*180/math.pi - next_iter_std_mult_theta * RMSE_theta, thetaleft_bound_iter1) # degree
+         args.position_gt_thetaright_bound = min(pred_positions[i,0,1]*180/math.pi + next_iter_std_mult_theta * RMSE_theta, thetaright_bound_iter1) # degree  
+      elif dataset_type == 'test': # use empirical RMSEs of r and theta
+         args.position_gt_rleft_bound = max(pred_positions[i, 0, 0] - next_iter_std_mult_r * Empirical_RMSE_r, rleft_bound_iter1)
+         args.position_gt_rright_bound = min(pred_positions[i,0,0] + next_iter_std_mult_r * Empirical_RMSE_r, rright_bound_iter1)
+         args.position_gt_thetaleft_bound = max(pred_positions[i,0,1]*180/math.pi - next_iter_std_mult_theta * Empirical_RMSE_theta, thetaleft_bound_iter1) # degree 
+         args.position_gt_thetaright_bound = min(pred_positions[i,0,1]*180/math.pi + next_iter_std_mult_theta * Empirical_RMSE_theta, thetaright_bound_iter1) # degree
+      else:
+         raise Exception("Invalid dataset_type")
+      # Generate new dictionary matrix A_dic, and corresponding hypothesis positions (r, theta)   
+      generator_iter2 = DataGenerator(args)
+      A_dic, r_positions_iter2[i], theta_positions_iter2[i] = generator_iter2.dictionary_matrix_rtheta()
+      
+      min_distance_index_iter2[i], distances_iter2[i] = utils.match_hypothesis(A_dic, y_mean[i])
+      
+   end = time.time()
+   t_GridSearch_iter2 = end - start
+   t_GridSearch_persample_iter2 = t_GridSearch_iter2 / samples_run
 
-for i in range(samples_run):
-   ### New dictionaries ###
-   # New search area
-   args.position_gt_rleft_bound = max(pred_positions[i, 0, 0] - next_iter_std_mult_r * RMSE_r, rleft_bound_iter1)
-   args.position_gt_rright_bound = min(pred_positions[i,0,0] + next_iter_std_mult_r * RMSE_r, rright_bound_iter1)
-   args.position_gt_thetaleft_bound = max(pred_positions[i,0,1]*180/math.pi - next_iter_std_mult_theta * RMSE_theta, thetaleft_bound_iter1) # degree
-   args.position_gt_thetaright_bound = min(pred_positions[i,0,1]*180/math.pi + next_iter_std_mult_theta * RMSE_theta, thetaright_bound_iter1) # degree  
-   # Generate new dictionary matrix A_dic, and corresponding hypothesis positions (r, theta)   
-   generator_iter2 = DataGenerator(args)
-   A_dic, r_positions_iter2[i], theta_positions_iter2[i] = generator_iter2.dictionary_matrix_rtheta()
-    
-   min_distance_index_iter2[i], distances_iter2[i] = utils.match_hypothesis(A_dic, y_mean[i])
-   
-end = time.time()
-t_GridSearch_iter2 = end - start
-t_GridSearch_persample_iter2 = t_GridSearch_iter2 / samples_run
+   for i in range(samples_run):
+      # get hypothesis position
+      r_value, theta_value = utils.get_hypothesis_position(min_distance_index_iter2[i], r_positions_iter2[i], theta_positions_iter2[i])
+      pred_positions_iter2[i, 0, :] = torch.tensor([r_value, theta_value], dtype=torch.float32, device=device)
 
-for i in range(samples_run):
-   # get hypothesis position
-   r_value, theta_value = utils.get_hypothesis_position(min_distance_index_iter2[i], r_positions_iter2[i], theta_positions_iter2[i])
-   pred_positions_iter2[i, 0, :] = torch.tensor([r_value, theta_value], dtype=torch.float32, device=device)
+   # convert to xy coordinates
+   pred_positions_xy_iter2 = utils.batch_polar_to_cartesian(pred_positions_iter2)
 
-# convert to xy coordinates
-pred_positions_xy_iter2 = utils.batch_polar_to_cartesian(pred_positions_iter2)
+   # compute RMSEs
+   squared_diffs_xy_iter2 = utils.batched_permuted_SquareDiff_2D(pred_positions_xy_iter2, gt_positions_xy) 
+   RMSE_distance_iter2, Empirical_variance_distance_iter2 = utils.RMSE_distance_error(squared_diffs_xy_iter2)
+   squared_diffs_polar_iter2 = utils.batched_permuted_SquareDiff_2D(pred_positions_iter2, gt_positions)
+   RMSE_r_iter2, RMSE_theta_iter2, Empirical_variance_r_iter2, Empirical_variance_theta_iter2 = utils.RMSE_AxisWise_error(squared_diffs_polar_iter2)
+   RMSE_theta_iter2 = RMSE_theta_iter2 * 180 / math.pi
+   Empirical_variance_theta_iter2 = Empirical_variance_theta_iter2 * 180 / math.pi
 
-# compute RMSEs
-squared_diffs_xy_iter2 = utils.batched_permuted_SquareDiff_2D(pred_positions_xy_iter2, gt_positions_xy) 
-RMSE_distance_iter2, Empirical_variance_distance_iter2 = utils.RMSE_distance_error(squared_diffs_xy_iter2)
-squared_diffs_polar_iter2 = utils.batched_permuted_SquareDiff_2D(pred_positions_iter2, gt_positions)
-RMSE_r_iter2, RMSE_theta_iter2, Empirical_variance_r_iter2, Empirical_variance_theta_iter2 = utils.RMSE_AxisWise_error(squared_diffs_polar_iter2)
-RMSE_theta_iter2 = RMSE_theta_iter2 * 180 / math.pi
-Empirical_variance_theta_iter2 = Empirical_variance_theta_iter2 * 180 / math.pi
+   print('Results (grid search iteration2):')
+   print('RMSE r = {} [m]'.format(RMSE_r_iter2))
+   print('empirical variance of r = {} [m]'.format(Empirical_variance_r_iter2))
+   print('RMSE theta = {} [deg]'.format(RMSE_theta_iter2))
+   print('empirical variance of theta = {} [deg]'.format(Empirical_variance_theta_iter2))
+   print('RMSE distance = {} [m]'.format(RMSE_distance_iter2))
+   print('empirical variance of distance = {} [m]'.format(Empirical_variance_distance_iter2))
 
-print('Results (grid search iteration2):')
-print('RMSE r = {} [m]'.format(RMSE_r_iter2))
-print('empirical variance of r = {} [m]'.format(Empirical_variance_r_iter2))
-print('RMSE theta = {} [deg]'.format(RMSE_theta_iter2))
-print('empirical variance of theta = {} [deg]'.format(Empirical_variance_theta_iter2))
-print('RMSE distance = {} [m]'.format(RMSE_distance_iter2))
-print('empirical variance of distance = {} [m]'.format(Empirical_variance_distance_iter2))
+   # Print Run Time
+   print('Run Time/sample= {} [sec]'.format(t_GridSearch_persample_iter2))
 
-# Print Run Time
-print('Run Time/sample= {} [sec]'.format(t_GridSearch_persample_iter2))
+   # Save empirical RMSEs of r and theta if "train" dataset
+   if dataset_type == 'train':
+      Empirical_RMSE_r_iter2 = RMSE_r_iter2
+      Empirical_RMSE_theta_iter2 = RMSE_theta_iter2
 
+   ##########################################################################################
+   ### iteration 3 ###
+   # Tuning parameters for iteration 3
+   args.m_r = 101
+   args.m_theta = 91
+   m = args.m_r * args.m_theta # total num of hypotheses
+   next_iter_std_mult_r = 3
+   next_iter_std_mult_theta = 3
 
+   print('======================================')
+   # Dataset
+   print('new search area: pred R +/- {} * RMSE_R'.format(next_iter_std_mult_r))
+   print('new search area: pred theta +/- {} * RMSE_theta'.format(next_iter_std_mult_theta))
+   print('# sample points of r = {}'.format(args.m_r))
+   print('# sample points of theta = {}'.format(args.m_theta))
 
-##########################################################################################
-### iteration 3 ###
-# Tuning parameters for iteration 3
-args.m_r = 1001
-args.m_theta = 91
-m = args.m_r * args.m_theta # total num of hypotheses
-next_iter_std_mult_r = 3
-next_iter_std_mult_theta = 3
+   # initialize
+   pred_positions_iter3 = torch.zeros(samples_run, args.k, 2, dtype=torch.float32, device=device)
+   distances_iter3 = torch.zeros(samples_run, m, dtype=torch.float32, device=device)
+   min_distance_index_iter3 = torch.zeros(samples_run, dtype=torch.int32, device=device)
+   r_positions_iter3 = torch.zeros(samples_run, args.m_r, dtype=torch.float, device=device)
+   theta_positions_iter3 = torch.zeros(samples_run, args.m_theta, dtype=torch.float, device=device)
 
-print('======================================')
-# Dataset
-print('new search area: pred R +/- {} * RMSE_R'.format(next_iter_std_mult_r))
-print('new search area: pred theta +/- {} * RMSE_theta'.format(next_iter_std_mult_theta))
-print('# sample points of r = {}'.format(args.m_r))
-print('# sample points of theta = {}'.format(args.m_theta))
+   start = time.time()
 
-# initialize
-pred_positions_iter3 = torch.zeros(samples_run, args.k, 2, dtype=torch.float32, device=device)
-distances_iter3 = torch.zeros(samples_run, m, dtype=torch.float32, device=device)
-min_distance_index_iter3 = torch.zeros(samples_run, dtype=torch.int32, device=device)
-r_positions_iter3 = torch.zeros(samples_run, args.m_r, dtype=torch.float, device=device)
-theta_positions_iter3 = torch.zeros(samples_run, args.m_theta, dtype=torch.float, device=device)
+   for i in range(samples_run):
+      ### New dictionaries ###
+      # New search area
+      if dataset_type == 'train':
+         args.position_gt_rleft_bound = max(pred_positions_iter2[i, 0, 0] - next_iter_std_mult_r * RMSE_r_iter2, rleft_bound_iter1)
+         args.position_gt_rright_bound = min(pred_positions_iter2[i,0,0] + next_iter_std_mult_r * RMSE_r_iter2, rright_bound_iter1)
+         args.position_gt_thetaleft_bound = max(pred_positions_iter2[i,0,1]*180/math.pi - next_iter_std_mult_theta * RMSE_theta_iter2, thetaleft_bound_iter1) # degree
+         args.position_gt_thetaright_bound = min(pred_positions_iter2[i,0,1]*180/math.pi + next_iter_std_mult_theta * RMSE_theta_iter2, thetaright_bound_iter1) # degree  
+      elif dataset_type == 'test': # use empirical RMSEs of r and theta
+         args.position_gt_rleft_bound = max(pred_positions_iter2[i, 0, 0] - next_iter_std_mult_r * Empirical_RMSE_r_iter2, rleft_bound_iter1)
+         args.position_gt_rright_bound = min(pred_positions_iter2[i,0,0] + next_iter_std_mult_r * Empirical_RMSE_r_iter2, rright_bound_iter1)
+         args.position_gt_thetaleft_bound = max(pred_positions_iter2[i,0,1]*180/math.pi - next_iter_std_mult_theta * Empirical_RMSE_theta_iter2, thetaleft_bound_iter1) # degree
+         args.position_gt_thetaright_bound = min(pred_positions_iter2[i,0,1]*180/math.pi + next_iter_std_mult_theta * Empirical_RMSE_theta_iter2, thetaright_bound_iter1) # degree
+      # Generate new dictionary matrix A_dic, and corresponding hypothesis positions (r, theta)   
+      generator_iter3 = DataGenerator(args)
+      A_dic, r_positions_iter3[i], theta_positions_iter3[i] = generator_iter3.dictionary_matrix_rtheta()
+      
+      min_distance_index_iter3[i], distances_iter3[i] = utils.match_hypothesis(A_dic, y_mean[i])
+      
+   end = time.time()
+   t_GridSearch_iter3 = end - start
+   t_GridSearch_persample_iter3 = t_GridSearch_iter3 / samples_run
 
-start = time.time()
+   for i in range(samples_run):
+      # get hypothesis position
+      r_value, theta_value = utils.get_hypothesis_position(min_distance_index_iter3[i], r_positions_iter3[i], theta_positions_iter3[i])
+      pred_positions_iter3[i, 0, :] = torch.tensor([r_value, theta_value], dtype=torch.float32, device=device)
 
-for i in range(samples_run):
-   ### New dictionaries ###
-   # New search area
-   args.position_gt_rleft_bound = max(pred_positions_iter2[i, 0, 0] - next_iter_std_mult_r * RMSE_r_iter2, rleft_bound_iter1)
-   args.position_gt_rright_bound = min(pred_positions_iter2[i,0,0] + next_iter_std_mult_r * RMSE_r_iter2, rright_bound_iter1)
-   args.position_gt_thetaleft_bound = max(pred_positions_iter2[i,0,1]*180/math.pi - next_iter_std_mult_theta * RMSE_theta_iter2, thetaleft_bound_iter1) # degree
-   args.position_gt_thetaright_bound = min(pred_positions_iter2[i,0,1]*180/math.pi + next_iter_std_mult_theta * RMSE_theta_iter2, thetaright_bound_iter1) # degree  
-   # Generate new dictionary matrix A_dic, and corresponding hypothesis positions (r, theta)   
-   generator_iter3 = DataGenerator(args)
-   A_dic, r_positions_iter3[i], theta_positions_iter3[i] = generator_iter3.dictionary_matrix_rtheta()
-    
-   min_distance_index_iter3[i], distances_iter3[i] = utils.match_hypothesis(A_dic, y_mean[i])
-   
-end = time.time()
-t_GridSearch_iter3 = end - start
-t_GridSearch_persample_iter3 = t_GridSearch_iter3 / samples_run
+   # convert to xy coordinates
+   pred_positions_xy_iter3 = utils.batch_polar_to_cartesian(pred_positions_iter3)
 
-for i in range(samples_run):
-   # get hypothesis position
-   r_value, theta_value = utils.get_hypothesis_position(min_distance_index_iter3[i], r_positions_iter3[i], theta_positions_iter3[i])
-   pred_positions_iter3[i, 0, :] = torch.tensor([r_value, theta_value], dtype=torch.float32, device=device)
+   # compute RMSEs
+   squared_diffs_xy_iter3 = utils.batched_permuted_SquareDiff_2D(pred_positions_xy_iter3, gt_positions_xy) 
+   RMSE_distance_iter3, Empirical_variance_distance_iter3 = utils.RMSE_distance_error(squared_diffs_xy_iter3)
+   squared_diffs_polar_iter3 = utils.batched_permuted_SquareDiff_2D(pred_positions_iter3, gt_positions)
+   RMSE_r_iter3, RMSE_theta_iter3,Empirical_variance_r_iter3,Empirical_variance_theta_iter3 = utils.RMSE_AxisWise_error(squared_diffs_polar_iter3)
+   RMSE_theta_iter3 = RMSE_theta_iter3 * 180 / math.pi
+   Empirical_variance_theta_iter3 = Empirical_variance_theta_iter3 * 180 / math.pi
 
-# convert to xy coordinates
-pred_positions_xy_iter3 = utils.batch_polar_to_cartesian(pred_positions_iter3)
-
-# compute RMSEs
-squared_diffs_xy_iter3 = utils.batched_permuted_SquareDiff_2D(pred_positions_xy_iter3, gt_positions_xy) 
-RMSE_distance_iter3, Empirical_variance_distance_iter3 = utils.RMSE_distance_error(squared_diffs_xy_iter3)
-squared_diffs_polar_iter3 = utils.batched_permuted_SquareDiff_2D(pred_positions_iter3, gt_positions)
-RMSE_r_iter3, RMSE_theta_iter3,Empirical_variance_r_iter3,Empirical_variance_theta_iter3 = utils.RMSE_AxisWise_error(squared_diffs_polar_iter3)
-RMSE_theta_iter3 = RMSE_theta_iter3 * 180 / math.pi
-Empirical_variance_theta_iter3 = Empirical_variance_theta_iter3 * 180 / math.pi
-
-print('Results (grid search iteration3):')
-print('RMSE r = {} [m]'.format(RMSE_r_iter3))
-print('empirical variance of r = {} [m]'.format(Empirical_variance_r_iter3))
-print('RMSE theta = {} [deg]'.format(RMSE_theta_iter3))
-print('empirical variance of theta = {} [deg]'.format(Empirical_variance_theta_iter3))
-print('RMSE distance = {} [m]'.format(RMSE_distance_iter3))
-print('empirical variance of distance = {} [m]'.format(Empirical_variance_distance_iter3))
-# Print Run Time
-print('Run Time/sample= {} [sec]'.format(t_GridSearch_persample_iter3))
+   print('Results (grid search iteration3):')
+   print('RMSE r = {} [m]'.format(RMSE_r_iter3))
+   print('empirical variance of r = {} [m]'.format(Empirical_variance_r_iter3))
+   print('RMSE theta = {} [deg]'.format(RMSE_theta_iter3))
+   print('empirical variance of theta = {} [deg]'.format(Empirical_variance_theta_iter3))
+   print('RMSE distance = {} [m]'.format(RMSE_distance_iter3))
+   print('empirical variance of distance = {} [m]'.format(Empirical_variance_distance_iter3))
+   # Print Run Time
+   print('Run Time/sample= {} [sec]'.format(t_GridSearch_persample_iter3))
 
 
 #######################
