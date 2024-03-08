@@ -39,24 +39,25 @@ args.sample = 100 # number of samples
 args.r2 = 1e-3 # noise variance
 samples_run = args.sample
 args.on_grid = False # gt positions are on grid or not
-args.position_gt_rleft_bound = 500
-args.position_gt_rright_bound = 550
-args.position_gt_thetaleft_bound = 45
-args.position_gt_thetaright_bound = 135
-rleft_bound_iter1 = args.position_gt_rleft_bound
-rright_bound_iter1 = args.position_gt_rright_bound
-thetaleft_bound_iter1 = args.position_gt_thetaleft_bound
-thetaright_bound_iter1 = args.position_gt_thetaright_bound
 
 for dataset_type in dataset_types:
+   args.position_gt_rleft_bound = 500
+   args.position_gt_rright_bound = 550
+   args.position_gt_thetaleft_bound = 45
+   args.position_gt_thetaright_bound = 135
+   rleft_bound_iter1 = args.position_gt_rleft_bound
+   rright_bound_iter1 = args.position_gt_rright_bound
+   thetaleft_bound_iter1 = args.position_gt_thetaleft_bound
+   thetaright_bound_iter1 = args.position_gt_thetaright_bound
    #### Generate data ####
-   generator_iter1 = DataGenerator(args)
-   # gt_positions, x_true, y_train, y_noiseless = generator_iter1.generate_experiment_data_rtheta()
+   generator_iter1 = DataGenerator(args)  
    if dataset_type == 'train':
-      # torch.save([gt_positions, x_true, y_train, y_noiseless], data_folder+data_file_name_train)
+      gt_positions, x_true, y_train, y_noiseless = generator_iter1.generate_experiment_data_rtheta()
+      torch.save([gt_positions, x_true, y_train, y_noiseless], data_folder+data_file_name_train)
       [gt_positions, x_true, y_train, y_noiseless] = torch.load(data_folder+data_file_name_train, map_location=device)
    elif dataset_type == 'test':
-      # torch.save([gt_positions, x_true, y_train, y_noiseless], data_folder+data_file_name_test)
+      gt_positions, x_true, y_train, y_noiseless = generator_iter1.generate_experiment_data_rtheta()
+      torch.save([gt_positions, x_true, y_train, y_noiseless], data_folder+data_file_name_test)
       [gt_positions, x_true, y_train, y_noiseless] = torch.load(data_folder+data_file_name_test, map_location=device)
    else:
       raise Exception("Invalid dataset_type")
@@ -136,7 +137,7 @@ for dataset_type in dataset_types:
    ##########################################################################################
    ### iteration 2 ###
    # Tuning parameters for iteration 2
-   args.m_r = 101
+   args.m_r = 11
    args.m_theta = 91
    m = args.m_r * args.m_theta # total num of hypotheses
    next_iter_std_mult_r = 3
@@ -218,7 +219,7 @@ for dataset_type in dataset_types:
    ##########################################################################################
    ### iteration 3 ###
    # Tuning parameters for iteration 3
-   args.m_r = 101
+   args.m_r = 11
    args.m_theta = 91
    m = args.m_r * args.m_theta # total num of hypotheses
    next_iter_std_mult_r = 3
