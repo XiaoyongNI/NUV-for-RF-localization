@@ -23,8 +23,8 @@ else:
 # path names
 plot_folder = 'simulations/plots/'
 data_folder = 'data/N16/'
-data_file_name_train = 'data_polar_n16_train.pt'
-data_file_name_test = 'data_polar_n16_test.pt'
+data_file_name_train = 'data_polar_n16_r21e-2_train.pt'
+data_file_name_test = 'data_polar_n16_r21e-2_test.pt'
 matlab_file_name = 'result_polar_n16lownoise_gridsearch3iters11x91.mat'
 
 # Tuning parameters
@@ -36,7 +36,7 @@ args.n = 16 # number of antennas
 # dataset settings
 dataset_types = ['train', 'test']
 args.sample = 100 # number of samples
-args.r2 = 1e-3 # noise variance
+args.r2 = 1e-2 # noise variance
 samples_run = args.sample
 args.on_grid = False # gt positions are on grid or not
 
@@ -52,12 +52,12 @@ for dataset_type in dataset_types:
    #### Generate data ####
    generator_iter1 = DataGenerator(args)  
    if dataset_type == 'train':
-      # gt_positions, x_true, y_train, y_noiseless = generator_iter1.generate_experiment_data_rtheta()
-      # torch.save([gt_positions, x_true, y_train, y_noiseless], data_folder+data_file_name_train)
+      gt_positions, x_true, y_train, y_noiseless = generator_iter1.generate_experiment_data_rtheta()
+      torch.save([gt_positions, x_true, y_train, y_noiseless], data_folder+data_file_name_train)
       [gt_positions, x_true, y_train, y_noiseless] = torch.load(data_folder+data_file_name_train, map_location=device)
    elif dataset_type == 'test':
-      # gt_positions, x_true, y_train, y_noiseless = generator_iter1.generate_experiment_data_rtheta()
-      # torch.save([gt_positions, x_true, y_train, y_noiseless], data_folder+data_file_name_test)
+      gt_positions, x_true, y_train, y_noiseless = generator_iter1.generate_experiment_data_rtheta()
+      torch.save([gt_positions, x_true, y_train, y_noiseless], data_folder+data_file_name_test)
       [gt_positions, x_true, y_train, y_noiseless] = torch.load(data_folder+data_file_name_test, map_location=device)
    else:
       raise Exception("Invalid dataset_type")
@@ -121,7 +121,7 @@ for dataset_type in dataset_types:
    print('empirical variance of theta = {} [deg]'.format(Empirical_variance_theta))
    print('RMSE distance = {} [m]'.format(RMSE_distance))
    print('empirical variance of distance = {} [m]'.format(Empirical_variance_distance))
-
+   
    # Print Run Time
    print('Run Time/sample= {} [sec]'.format(t_GridSearch_persample))
    if args.coherent_source:
@@ -129,7 +129,8 @@ for dataset_type in dataset_types:
    else:
       SNR = 10*math.log10((args.x_var) / args.r2)
    print('SNR = {} [dB]'.format(SNR))
-
+   # Summary print
+   print(RMSE_r.item(), Empirical_variance_r.item(), RMSE_theta.item(), Empirical_variance_theta.item(), RMSE_distance.item(), Empirical_variance_distance.item(),t_GridSearch_persample)
    # Save empirical RMSEs of r and theta if "train" dataset
    if dataset_type == 'train':
       Empirical_RMSE_r = RMSE_r
@@ -211,7 +212,8 @@ for dataset_type in dataset_types:
 
    # Print Run Time
    print('Run Time/sample= {} [sec]'.format(t_GridSearch_persample_iter2))
-
+   # Summary print
+   print(RMSE_r_iter2.item(), Empirical_variance_r_iter2.item(), RMSE_theta_iter2.item(), Empirical_variance_theta_iter2.item(), RMSE_distance_iter2.item(), Empirical_variance_distance_iter2.item(),t_GridSearch_persample_iter2)
    # Save empirical RMSEs of r and theta if "train" dataset
    if dataset_type == 'train':
       Empirical_RMSE_r_iter2 = RMSE_r_iter2
@@ -290,7 +292,8 @@ for dataset_type in dataset_types:
    print('empirical variance of distance = {} [m]'.format(Empirical_variance_distance_iter3))
    # Print Run Time
    print('Run Time/sample= {} [sec]'.format(t_GridSearch_persample_iter3))
-
+   # Summary print
+   print(RMSE_r_iter3.item(), Empirical_variance_r_iter3.item(), RMSE_theta_iter3.item(), Empirical_variance_theta_iter3.item(), RMSE_distance_iter3.item(), Empirical_variance_distance_iter3.item(),t_GridSearch_persample_iter3)
 
 #######################
 ### Save for MATLAB ###

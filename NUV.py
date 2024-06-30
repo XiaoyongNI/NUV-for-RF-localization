@@ -19,6 +19,11 @@ def NUV_SSR(args, A, y, r, m):
       u: MAP of the hypotheses (size m)
       iterations: number of iterations
    """
+   # eliminate random initial phase
+   initial_phase = torch.angle(y[0])
+   phase_factor = torch.exp(-1j * initial_phase)
+   y = y * phase_factor
+
    # Set up parameters
    A_H = A.conj().T
    n = args.n

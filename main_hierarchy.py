@@ -10,7 +10,7 @@ from data.data_gen import DataGenerator
 
 #### initialization ####
 args = config.general_settings()
-args.use_cuda = True
+args.use_cuda = False
 # GPU or CPU
 if args.use_cuda:
    if torch.cuda.is_available():
@@ -23,8 +23,8 @@ else:
     print("Using CPU")
 # path names
 plot_folder = 'simulations/plots/'
-data_folder = 'data/'
-data_file_name = 'data_polar_n16_highnoise.pt'
+data_folder = 'data/N16/'
+data_file_name = 'data_polar_n16_r21e-3_test.pt'
 matlab_file_name = 'result_polar_n16highnoise_NUV2D.mat'
 
 args.q_init = 0.01
@@ -42,13 +42,13 @@ args.convergence_threshold = 1e-1
 
 # dataset settings
 args.n = 16 # number of antennas
-args.r2 = 1 # noise variance
+args.r2 = 1e-3 # noise variance
 args.sample = 100 # number of samples
 samples_run = args.sample
 args.on_grid = False # gt positions are on grid or not
 args.plot_grid = True # plot grid or not
-args.position_gt_rleft_bound = 500
-args.position_gt_rright_bound = 550
+args.position_gt_rleft_bound = 50
+args.position_gt_rright_bound = 100
 args.position_gt_thetaleft_bound = 45
 args.position_gt_thetaright_bound = 135
 
