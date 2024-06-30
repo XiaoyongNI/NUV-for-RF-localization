@@ -21,15 +21,15 @@ def general_settings():
     parser.add_argument('--m_y', type=int, default=3, metavar='m_y',
                         help='number of grids in y')
 
-    parser.add_argument('--coherent_source', type=bool, default=True, metavar='coherent',
+    parser.add_argument('--coherent_source', type=bool, default=False, metavar='coherent',
                         help='if True, use coherent source')
-    parser.add_argument('--x_var', type=float, default=0.5, metavar='x_var',
+    parser.add_argument('--x_var', type=float, default=1, metavar='x_var',
                         help='variance of source signals')
     parser.add_argument('--mean_c', type=float, default=2, metavar='mean_c',
                         help='mean of source signals')
     parser.add_argument('--r2', type=float, default=1e-3, metavar='r2',
                         help='ground truth variance of observation noise')
-    parser.add_argument('--l', type=int, default=100, metavar='l',
+    parser.add_argument('--l', type=int, default=1, metavar='l',
                         help='number of snapshots')
 
     parser.add_argument('--wave_length', type=float, default=1, metavar='wave_length',

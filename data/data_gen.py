@@ -71,10 +71,13 @@ class DataGenerator:
     # (r, theta) coordinates
     def position_generator_rtheta(self): 
         """Generates random positions."""
-        # Generate random positions
+        # Generate random positions uniformly in the sector!
         gt_positions = torch.zeros(self.args.sample, self.args.k, 2, dtype=torch.float32, device=self.device)
-        # r coordinates
-        gt_positions[:, :, 0] = torch.rand(self.args.sample, self.args.k, dtype=torch.float32, device=self.device) * (self.args.position_gt_rright_bound - self.args.position_gt_rleft_bound) + self.args.position_gt_rleft_bound
+        # r coordinates 
+        u = torch.rand(self.args.sample, self.args.k, dtype=torch.float32, device=self.device)
+        r2 = u * (self.args.position_gt_rright_bound ** 2 - self.args.position_gt_rleft_bound ** 2) + self.args.position_gt_rleft_bound ** 2
+        gt_positions[:, :, 0] = torch.sqrt(r2)
+
         # theta coordinates
         gt_positions[:, :, 1] = torch.rand(self.args.sample, self.args.k, dtype=torch.float32, device=self.device) * (self.args.position_gt_thetaright_bound - self.args.position_gt_thetaleft_bound) + self.args.position_gt_thetaleft_bound
         # convert deg to rad
@@ -83,14 +86,18 @@ class DataGenerator:
     
     def position_ongrid_generator_rtheta(self): 
         """Generates random positions on the grid."""
-        # Generate random positions
+        # Generate random positions uniformly
         gt_positions = torch.zeros(self.args.sample, self.args.k, 2, dtype=torch.float32, device=self.device)
         # grid
         _, r_positions, theta_positions = self.dictionary_matrix_rtheta()
+        # sample in integers in range [1, m_r*m_theta]
+        idx = torch.randint(0, self.args.m_r * self.args.m_theta, (self.args.sample, self.args.k), device=self.device)
         # r coordinates
-        gt_positions[:, :, 0] = r_positions[torch.randint(0, self.args.m_r, (self.args.sample, self.args.k), device=self.device)]
+        r_idx = idx // self.args.m_theta
+        gt_positions[:, :, 0] = r_positions[r_idx]
         # theta coordinates
-        gt_positions[:, :, 1] = theta_positions[torch.randint(0, self.args.m_theta, (self.args.sample, self.args.k), device=self.device)]
+        theta_idx = idx % self.args.m_theta
+        gt_positions[:, :, 1] = theta_positions[theta_idx]
 
         return gt_positions
     
@@ -135,8 +142,8 @@ class DataGenerator:
             ULA_array_batch = ULA_array.unsqueeze(0).repeat(self.args.sample, 1, 1)
             # compute distances from each source to each ULA element (polar coordinates)
             distances = polar_distance(source[:, :, 0], source[:, :, 1], ULA_array_batch[:, :, 0], ULA_array_batch[:, :, 1])
-            # compute relative distances from the first ULA element
-            distances = distances - distances[:, 0].unsqueeze(1).repeat(1, self.args.n)
+            # # compute relative distances from the first ULA element
+            # distances = distances - distances[:, 0].unsqueeze(1).repeat(1, self.args.n)
             # compute phase shifts
             phase_shifts = distances * 2 * math.pi / self.args.wave_length
             # compute steering matrix
@@ -160,7 +167,7 @@ class DataGenerator:
         
         x = scale_factor * (real_part + 1j * imag_part)
 
-        x = x + self.args.mean_c
+        # x = x + self.args.mean_c
         
         return x
     

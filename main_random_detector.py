@@ -20,8 +20,8 @@ else:
     device = torch.device('cpu')
     print("Using CPU")
 # path names
-data_folder = 'data/'
-data_file_name = 'data_polar_n16_highnoise.pt'
+data_folder = 'data/N16/'
+data_file_name = 'data_polar_n16_test.pt'
 
 # Tuning parameters
 args.m_r = 11 # number of sample points of r
@@ -31,11 +31,11 @@ args.n = 16 # number of antennas
 
 # dataset settings
 args.sample = 100 # number of samples
-args.r2 = 1 # noise variance
+args.r2 = 1e-3 # noise variance
 samples_run = args.sample
 args.on_grid = False # gt positions are on grid or not
-args.position_gt_rleft_bound = 500
-args.position_gt_rright_bound = 550
+args.position_gt_rleft_bound = 50
+args.position_gt_rright_bound = 100
 args.position_gt_thetaleft_bound = 45
 args.position_gt_thetaright_bound = 135
 rleft_bound_iter1 = args.position_gt_rleft_bound
@@ -108,5 +108,5 @@ print('Run Time/sample= {} [sec]'.format(t_RandomDetector_persample))
 if args.coherent_source:
     SNR = 10*math.log10((args.mean_c) / args.r2)
 else:
-    SNR = 10*math.log10((args.x_var + args.mean_c) / args.r2)
+    SNR = 10*math.log10((args.x_var) / args.r2)
 print('SNR = {} [dB]'.format(SNR))

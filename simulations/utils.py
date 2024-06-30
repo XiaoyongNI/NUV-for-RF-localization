@@ -3,6 +3,10 @@ from scipy.signal import find_peaks
 import itertools 
 from torch.nn.functional import pad
 
+####################
+### Peak finding ###
+####################
+
 # find peaks 1D (known k)
 def peak_finding(u, k):
   """
@@ -161,6 +165,12 @@ def batch_peak_finding_2D(u, k):
 
   return peak_indices
 
+
+###################
+### Convertions ###
+###################
+
+
 # de-flatten, convert 1D spectrum back to 2D
 def de_flatten(spectrum, m_x1, m_x2):  
   """
@@ -262,6 +272,10 @@ def batch_polar_to_cartesian(positions):
 
   return positions
 
+############
+### MSEs ###
+############
+
 # permuted MSE computation
 def permuted_mse_1D(pred, DOA):
     """
@@ -314,12 +328,12 @@ def batched_permuted_mse_1D(pred, DOA):
 
 # permuted MSE 2D
 
-# batch version of permuted MSE 2D
+# batch version of permuted square error 2D
 def batched_permuted_SquareDiff_2D(pred, gt):
   """
   input: pred, tensor of size [batch_size, k, 2]
           gt, tensor of size [batch_size, k, 2]
-  output: permuted MSE
+  output: permuted square error
   """
   batch_size, k, _ = pred.shape
   device = pred.device
@@ -337,7 +351,7 @@ def batched_permuted_SquareDiff_2D(pred, gt):
   # Gather results according to permutations
   permuted_preds = torch.gather(expanded_pred, 2, perms.unsqueeze(-1).repeat(1, 1, 1, 2))  # [batch_size, k!, k, 2]
 
-  # Step 3: Compute the MSE for each permutation of each sample
+  # Step 3: Compute the square error for each permutation of each sample
   # Expand gt for broadcasting
   expanded_gt = gt.unsqueeze(1).expand(-1, perms.shape[1], -1, -1)  # [batch_size, k!, k, 2]
   squared_diffs = (permuted_preds - expanded_gt)**2
@@ -409,6 +423,8 @@ def match_hypothesis(A_dic, y_mean):
   # Calculate the phase of the complex numbers in the dictionary and the observation
   A_dic_phase = torch.angle(A_dic)
   y_mean_phase = torch.angle(y_mean)
+  # relative phase to first antenna (eliminate the random initial phase)
+  y_mean_phase = y_mean_phase - y_mean_phase[0]
 
   # Initialize a tensor to store the distances for each hypothesis
   distances = torch.zeros(A_dic.shape[1])

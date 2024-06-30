@@ -22,7 +22,7 @@ else:
     print("Using CPU")
 # path names
 plot_folder = 'simulations/plots/'
-data_folder = 'data/'
+data_folder = 'data/N16/'
 data_file_name_train = 'data_polar_n16_train.pt'
 data_file_name_test = 'data_polar_n16_test.pt'
 matlab_file_name = 'result_polar_n16lownoise_gridsearch3iters11x91.mat'
@@ -41,8 +41,8 @@ samples_run = args.sample
 args.on_grid = False # gt positions are on grid or not
 
 for dataset_type in dataset_types:
-   args.position_gt_rleft_bound = 500
-   args.position_gt_rright_bound = 550
+   args.position_gt_rleft_bound = 50
+   args.position_gt_rright_bound = 100
    args.position_gt_thetaleft_bound = 45
    args.position_gt_thetaright_bound = 135
    rleft_bound_iter1 = args.position_gt_rleft_bound
@@ -52,18 +52,19 @@ for dataset_type in dataset_types:
    #### Generate data ####
    generator_iter1 = DataGenerator(args)  
    if dataset_type == 'train':
-      gt_positions, x_true, y_train, y_noiseless = generator_iter1.generate_experiment_data_rtheta()
-      torch.save([gt_positions, x_true, y_train, y_noiseless], data_folder+data_file_name_train)
+      # gt_positions, x_true, y_train, y_noiseless = generator_iter1.generate_experiment_data_rtheta()
+      # torch.save([gt_positions, x_true, y_train, y_noiseless], data_folder+data_file_name_train)
       [gt_positions, x_true, y_train, y_noiseless] = torch.load(data_folder+data_file_name_train, map_location=device)
    elif dataset_type == 'test':
-      gt_positions, x_true, y_train, y_noiseless = generator_iter1.generate_experiment_data_rtheta()
-      torch.save([gt_positions, x_true, y_train, y_noiseless], data_folder+data_file_name_test)
+      # gt_positions, x_true, y_train, y_noiseless = generator_iter1.generate_experiment_data_rtheta()
+      # torch.save([gt_positions, x_true, y_train, y_noiseless], data_folder+data_file_name_test)
       [gt_positions, x_true, y_train, y_noiseless] = torch.load(data_folder+data_file_name_test, map_location=device)
    else:
       raise Exception("Invalid dataset_type")
    # generate dictionary matrix A_dic, and corresponding hypothesis positions (r, theta)
    A_dic, r_positions, theta_positions = generator_iter1.dictionary_matrix_rtheta() 
    y_mean = y_train.mean(dim=1) # generate y_mean by averaging l snapshots for each sample
+   print('y_mean shape = {}'.format(y_mean.shape))
 
 
    #### estimation ####
@@ -126,7 +127,7 @@ for dataset_type in dataset_types:
    if args.coherent_source:
       SNR = 10*math.log10((args.mean_c) / args.r2)
    else:
-      SNR = 10*math.log10((args.x_var + args.mean_c) / args.r2)
+      SNR = 10*math.log10((args.x_var) / args.r2)
    print('SNR = {} [dB]'.format(SNR))
 
    # Save empirical RMSEs of r and theta if "train" dataset

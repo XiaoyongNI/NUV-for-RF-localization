@@ -108,7 +108,7 @@ print("Total Run Time:", t)
 if args.coherent_source:
     SNR = 10*math.log10((args.mean_c) / args.r2)
 else:
-    SNR = 10*math.log10((args.x_var + args.mean_c) / args.r2)
+    SNR = 10*math.log10((args.x_var) / args.r2)
 print('SNR = {} [dB]'.format(SNR))
 
 # #### plotting ####
