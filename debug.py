@@ -1,55 +1,95 @@
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
 import torch
-from torch.nn.functional import pad
 
-k = 3
-spectrum_1 = torch.tensor([[100, 2, 300], [4, 5, 6], [7, 8, 9]], dtype=torch.float32)
-spectrum_2 = torch.tensor([[100, 2, 300], [4, 5, 6], [7, 8, 9]], dtype=torch.float32)
-spectrum = torch.stack([spectrum_1, spectrum_2], dim=0)
-# Pad the map with one element on each side with '-inf' values
-padded_map = pad(spectrum, (1, 1, 1, 1), mode='constant', value=float('-inf'))
-print(padded_map)
-# centers and 8 neighbors
-center = padded_map[:, 1:-1, 1:-1]
-top = padded_map[:, :-2, 1:-1]
-bottom = padded_map[:, 2:, 1:-1]
-left = padded_map[:, 1:-1, :-2]
-right = padded_map[:, 1:-1, 2:]
-top_left = padded_map[:, :-2, :-2]
-top_right = padded_map[:, :-2, 2:]
-bottom_left = padded_map[:, 2:, :-2]
-bottom_right = padded_map[:, 2:, 2:]
+# def gaussian_2d(x, y, x0, y0, sigma_x, sigma_y):
+#     """Compute 2D Gaussian in Cartesian coordinates."""
+#     return np.exp(-(((x - x0)**2 / (2 * sigma_x**2)) + ((y - y0)**2 / (2 * sigma_y**2))))
 
-peaks_mask = (
-    (center > top) &
-    (center > bottom) &
-    (center > left) &
-    (center > right) &
-    (center > top_left) &
-    (center > top_right) &
-    (center > bottom_left) &
-    (center > bottom_right) 
-)
+# # Define meshgrid in polar coordinates
+# # r = np.linspace(0, 5, 100)  # Radius
+# # theta = np.linspace(0, 2 * np.pi, 100)  # Angle
 
-# Create a tensor to hold the peak values
-peak_values = torch.where(peaks_mask, center, torch.full_like(center, float('-inf')))
+# # R, Theta = np.meshgrid(r, theta)
 
-# Now you want to get the top k values across the entire batch
-# Since you want to preserve the batch dimension, you use flatten(start_dim=1)
-flat_peak_values = peak_values.flatten(start_dim=1)
+# # # Convert polar coordinates to Cartesian for evaluation
+# # X = R * np.cos(Theta)
+# # Y = R * np.sin(Theta)
 
-# Perform topk to get the k largest elements and their indices in the flattened dimension
-topk_values, topk_flat_indices = torch.topk(flat_peak_values, k, dim=1)
+# # # Parameters of the Gaussian in Cartesian coordinates
+# # x0, y0 = 0, 0  # Center
+# # sigma_x, sigma_y = 1, 1  # Standard deviations
 
-# Convert the flat indices back to 2D indices
-peak_indices_2D = (topk_flat_indices // peak_values.size(2), topk_flat_indices % peak_values.size(2))
+# # # Compute the Gaussian
+# # Z = gaussian_2d(X, Y, x0, y0, sigma_x, sigma_y)
 
-# Prepare the 2D indices for each batch
-peak_batch_indices = torch.arange(0, spectrum.size(0)).view(-1, 1).expand(-1, k)
+# # # Plot the heat map
+# # plt.figure()
+# cmap = plt.cm.viridis
+# colors = cmap(np.arange(cmap.N))
+# colors[:, -1] = np.linspace(0.1, 1, cmap.N)  # Start with alpha=0.1 and gradually increase to 1
+# light_cmap = mcolors.LinearSegmentedColormap.from_list('light_viridis', colors)
 
-# Combine the batch indices with the 2D indices
-peak_indices = torch.stack((peak_batch_indices, peak_indices_2D[0], peak_indices_2D[1]), dim=2)
+# # plt.pcolormesh(R, Theta, Z, cmap=light_cmap)
+# # plt.colorbar(label='Intensity')
+# # plt.ylabel('Theta (rad)')
+# # plt.xlabel('Radius')
+# # plt.title('2D Gaussian Distribution in Polar Coordinates')
+# # plt.show()
 
 
+# # Define meshgrid in Cartesian coordinates
+# x = np.linspace(-5, 5, 100)
+# y = np.linspace(-5, 5, 100)
+
+# X, Y = np.meshgrid(x, y)
+
+# # Parameters of the Gaussian in Cartesian coordinates
+# x0, y0 = 0, 0  # Center
+# sigma_x, sigma_y = 1, 1  # Standard deviations
+
+# # Compute the Gaussian
+# Z = gaussian_2d(X, Y, x0, y0, sigma_x, sigma_y)
+
+# # Plot the heat map in Cartesian coordinates
+# plt.figure()
+# plt.pcolormesh(X, Y, Z, cmap=light_cmap)
+# plt.colorbar(label='Intensity')
+# plt.xlabel('X')
+# plt.ylabel('Y')
+# plt.title('2D Gaussian Distribution in Cartesian Coordinates')
+# plt.show()
+
+# Define a complex number and a float
+# complex_num = np.complex(2+3j)
+# real_num = 5.0
+# # Multiply using standard multiplication
+# result = complex_num * real_num
+
+# print(result)
 
 
+# Convert pt file to mat file
+import scipy.io as sio
+data_folder = 'data/N16/'
+data_file_name_test = 'data_polar_n16_r21e-2_test.pt'
+matlab_file_name = 'data_polar_n16_r21e-2_test.mat'
+gt_positions, x_true, y_train, y_noiseless = torch.load(data_folder + data_file_name_test)
 
+# Convert PyTorch tensors to NumPy arrays
+gt_positions_np = gt_positions.numpy()
+x_true_np = x_true.numpy()
+y_train_np = y_train.numpy()
+y_noiseless_np = y_noiseless.numpy()
+
+# Create a dictionary with the NumPy arrays
+matlab_dict = {
+    'gt_positions': gt_positions_np,
+    'x_true': x_true_np,
+    'y_train': y_train_np,
+    'y_noiseless': y_noiseless_np
+}
+
+# Save the data to a MATLAB file
+sio.savemat(data_folder + matlab_file_name, matlab_dict)

@@ -24,196 +24,314 @@ else:
 # path names
 plot_folder = 'simulations/plots/'
 data_folder = 'data/N16/'
-data_file_name = 'data_polar_n16_r21e-3_test.pt'
+data_file_name_train = 'data_polar_n16_r21e-1_train.pt'
+data_file_name_test = 'data_polar_n16_r21e-1_test.pt'
 matlab_file_name = 'result_polar_n16highnoise_NUV2D.mat'
 
-args.q_init = 0.01
+# dataset settings
 args.m_r = 11
 args.m_theta = 91
 m = args.m_r * args.m_theta # total num of hypotheses
-
-# Tuning parameters for low noise
-# r_tuning = 1
-# args.convergence_threshold = 4e-4
-
-# Tuning parameters for high noise
-r_tuning = 0.01
-args.convergence_threshold = 1e-1
-
-# dataset settings
+dataset_types = ['train', 'test']
 args.n = 16 # number of antennas
-args.r2 = 1e-3 # noise variance
+args.r2 = 1e-1 # noise variance
 args.sample = 100 # number of samples
 samples_run = args.sample
 args.on_grid = False # gt positions are on grid or not
 args.plot_grid = True # plot grid or not
-args.position_gt_rleft_bound = 50
-args.position_gt_rright_bound = 100
-args.position_gt_thetaleft_bound = 45
-args.position_gt_thetaright_bound = 135
 
-#### Generate data ####
-generator_iter1 = DataGenerator(args)
-# gt_positions, x_true, y_train, y_noiseless = generator_iter1.generate_experiment_data_rtheta()
-# torch.save([gt_positions, x_true, y_train, y_noiseless], data_folder+data_file_name)
-[gt_positions, x_true, y_train, y_noiseless] = torch.load(data_folder+data_file_name, map_location=device)
-# generate dictionary matrix A_dic, and corresponding hypothesis positions (r, theta)
-A_dic, r_positions, theta_positions = generator_iter1.dictionary_matrix_rtheta() 
-y_mean = y_train.mean(dim=1) # generate y_mean by averaging l snapshots for each sample
+for dataset_type in dataset_types:
+    args.position_gt_rleft_bound = 50
+    args.position_gt_rright_bound = 100
+    args.position_gt_thetaleft_bound = 45
+    args.position_gt_thetaright_bound = 135
+    rleft_bound_iter1 = args.position_gt_rleft_bound
+    rright_bound_iter1 = args.position_gt_rright_bound
+    thetaleft_bound_iter1 = args.position_gt_thetaleft_bound
+    thetaright_bound_iter1 = args.position_gt_thetaright_bound
+    #### Generate data ####
+    generator_iter1 = DataGenerator(args)  
+    if dataset_type == 'train':
+        # gt_positions, x_true, y_train, y_noiseless = generator_iter1.generate_experiment_data_rtheta()
+        # torch.save([gt_positions, x_true, y_train, y_noiseless], data_folder+data_file_name_train)
+        [gt_positions, x_true, y_train, y_noiseless] = torch.load(data_folder+data_file_name_train, map_location=device)
+    elif dataset_type == 'test':
+        # gt_positions, x_true, y_train, y_noiseless = generator_iter1.generate_experiment_data_rtheta()
+        # torch.save([gt_positions, x_true, y_train, y_noiseless], data_folder+data_file_name_test)
+        [gt_positions, x_true, y_train, y_noiseless] = torch.load(data_folder+data_file_name_test, map_location=device)
+    else:
+        raise Exception("Invalid dataset_type")
+    # generate dictionary matrix A_dic, and corresponding hypothesis positions (r, theta)
+    A_dic, r_positions, theta_positions = generator_iter1.dictionary_matrix_rtheta() 
+    y_mean = y_train.mean(dim=1) # generate y_mean by averaging l snapshots for each sample
+
+    # Tuning parameters for iteration 1
+    args.q_init = 0.01
+    args.m_r = 11
+    args.m_theta = 91
+    m = args.m_r * args.m_theta # total num of hypotheses
+    # Tuning parameters for low noise
+    # r_tuning = 1
+    # args.convergence_threshold = 4e-4
+    # Tuning parameters for high noise
+    r_tuning = 0.01
+    args.convergence_threshold = 1e-1
+    #### estimation ####
+    print('======================================')
+    # Tuning parameter
+    print('dataset type = {}'.format(dataset_type))
+    print('Tuning parameter (iteration1):')
+    print('r_tuning = {}'.format(r_tuning))
+    print('convergence_threshold = {}'.format(args.convergence_threshold))
+    # Dataset
+    print('# antennas = {}'.format(args.n))
+    print('r range = [{}, {}]'.format(args.position_gt_rleft_bound, args.position_gt_rright_bound))
+    print('theta range = [{}, {}] deg'.format(args.position_gt_thetaleft_bound, args.position_gt_thetaright_bound))
+    print('# sample points of r = {}'.format(args.m_r))
+    print('# sample points of theta = {}'.format(args.m_theta))
+
+    # initialize
+    x_pred = torch.zeros(samples_run, m, dtype=torch.cfloat, device=device)
+    EM_steps = torch.zeros(samples_run, dtype=torch.int, device=device)
+
+    start = time.time()
+    # NUV-SSR 
+    for i in range(samples_run):
+        x_pred[i], EM_steps[i] = NUV_SSR(args, A_dic, y_mean[i], r_tuning, m)   
+        
+    # de-flatten x_pred [sample, m_r*m_theta] -> [sample, m_r, m_theta]
+    x_pred_2D = utils.batch_de_flatten(x_pred, args.m_r, args.m_theta)
+
+    # find peaks [sample, k, 3]
+    peak_indices = utils.batch_peak_finding_2D(x_pred_2D, args.k)
+    end = time.time()
+    t_iter1 = end - start
+    t_iter1_persample = t_iter1 / samples_run
+
+    # for i in range(samples_run):
+    #     print ('EM steps = {}'.format(EM_steps[i]))
+
+    # convert to positions [sample, k, 2]
+    pred_positions = utils.batch_convert_to_positions(peak_indices, r_positions, theta_positions)
+
+    # convert to xy coordinates
+    pred_positions_xy = utils.batch_polar_to_cartesian(pred_positions)
+    gt_positions_xy = utils.batch_polar_to_cartesian(gt_positions)
+
+    # compute RMSEs
+    squared_diffs_xy = utils.batched_permuted_SquareDiff_2D(pred_positions_xy, gt_positions_xy) 
+    RMSE_distance, Empirical_variance_distance = utils.RMSE_distance_error(squared_diffs_xy)
+    squared_diffs_polar = utils.batched_permuted_SquareDiff_2D(pred_positions, gt_positions)
+    RMSE_r, RMSE_theta,Empirical_variance_r,Empirical_variance_theta = utils.RMSE_AxisWise_error(squared_diffs_polar)
+    RMSE_theta = RMSE_theta * 180 / math.pi
+    Empirical_variance_theta = Empirical_variance_theta * 180 / math.pi
+
+    print('Results (iteration1):')
+    print('average EM steps = {}'.format(torch.mean(EM_steps.float())))
+    print('RMSE r = {} [m]'.format(RMSE_r))
+    print('empirical variance of r = {} [m]'.format(Empirical_variance_r))
+    print('RMSE theta = {} [deg]'.format(RMSE_theta))
+    print('empirical variance of theta = {} [deg]'.format(Empirical_variance_theta))
+    print('RMSE distance = {} [m]'.format(RMSE_distance))
+    print('empirical variance of distance = {} [m]'.format(Empirical_variance_distance))
+    # Print Run Time
+    print('Run Time/sample= {} [sec]'.format(t_iter1_persample))
+    if args.coherent_source:
+        SNR = 10*math.log10((args.mean_c) / args.r2)
+    else:
+        SNR = 10*math.log10((args.x_var) / args.r2)
+    print('SNR = {} [dB]'.format(SNR))
+    # Summary print
+    print(RMSE_r.item(), Empirical_variance_r.item(), RMSE_theta.item(), Empirical_variance_theta.item(), RMSE_distance.item(), Empirical_variance_distance.item(),t_iter1_persample,torch.mean(EM_steps.float()).item())
+    # Save empirical RMSEs of r and theta if "train" dataset
+    if dataset_type == 'train':
+        Empirical_RMSE_r = RMSE_r
+        Empirical_RMSE_theta = RMSE_theta
 
 
-#### estimation ####
-print('======================================')
-# Tuning parameter
-print('Tuning parameter (iteration1):')
-print('r_tuning = {}'.format(r_tuning))
-print('convergence_threshold = {}'.format(args.convergence_threshold))
-# Dataset
-print('# antennas = {}'.format(args.n))
-print('r range = [{}, {}]'.format(args.position_gt_rleft_bound, args.position_gt_rright_bound))
-print('theta range = [{}, {}] deg'.format(args.position_gt_thetaleft_bound, args.position_gt_thetaright_bound))
-print('# sample points of r = {}'.format(args.m_r))
-print('# sample points of theta = {}'.format(args.m_theta))
+    ##########################################################################################
+    ### iteration 2 ###
+    args.m_r = 11
+    args.m_theta = 91
+    m = args.m_r * args.m_theta # total num of hypotheses
+    next_iter_std_mult_r = 3
+    next_iter_std_mult_theta = 3
+    # Tuning parameters for iteration 2 (high noise)
+    # r_tuning = 1
+    # args.convergence_threshold = 1e-3
+    # Tuning parameters for iteration 2 (low noise)
+    r_tuning = 10
+    args.convergence_threshold = 1e-2
 
-# initialize
-x_pred = torch.zeros(samples_run, m, dtype=torch.cfloat, device=device)
-EM_steps = torch.zeros(samples_run, dtype=torch.int, device=device)
+    print('======================================')
+    # Tuning parameter
+    print('dataset type = {}'.format(dataset_type))
+    print('Tuning parameter (iteration2):')
+    print('r_tuning = {}'.format(r_tuning))
+    print('convergence_threshold = {}'.format(args.convergence_threshold))
+    # Dataset
+    print('new search area: pred R +/- {} * RMSE_R'.format(next_iter_std_mult_r))
+    print('new search area: pred theta +/- {} * RMSE_theta'.format(next_iter_std_mult_theta))
+    print('# sample points of r = {}'.format(args.m_r))
+    print('# sample points of theta = {}'.format(args.m_theta))
 
-start = time.time()
-# NUV-SSR 
-for i in range(samples_run):
-    x_pred[i], EM_steps[i] = NUV_SSR(args, A_dic, y_mean[i], r_tuning, m)   
+    # Initialization
+    r_positions_iter2 = torch.zeros(samples_run, args.m_r, dtype=torch.float, device=device)
+    theta_positions_iter2 = torch.zeros(samples_run, args.m_theta, dtype=torch.float, device=device)
+    x_pred_iter2 = torch.zeros(samples_run, m, dtype=torch.cfloat, device=device)
+    EM_steps_iter2 = torch.zeros(samples_run, dtype=torch.int, device=device)
+    pred_positions_iter2 = torch.zeros(samples_run, args.k, 2, dtype=torch.float, device=device)
+
+    start = time.time()
+    for i in range(samples_run):
+        ### New dictionaries ###
+        # New search area
+        if dataset_type == 'train':
+            args.position_gt_rleft_bound = max(pred_positions[i, 0, 0] - next_iter_std_mult_r * RMSE_r, rleft_bound_iter1)
+            args.position_gt_rright_bound = min(pred_positions[i,0,0] + next_iter_std_mult_r * RMSE_r, rright_bound_iter1)
+            args.position_gt_thetaleft_bound = max(pred_positions[i,0,1]*180/math.pi - next_iter_std_mult_theta * RMSE_theta, thetaleft_bound_iter1) # degree
+            args.position_gt_thetaright_bound = min(pred_positions[i,0,1]*180/math.pi + next_iter_std_mult_theta * RMSE_theta, thetaright_bound_iter1) # degree  
+        elif dataset_type == 'test': # use empirical RMSEs of r and theta
+            args.position_gt_rleft_bound = max(pred_positions[i, 0, 0] - next_iter_std_mult_r * Empirical_RMSE_r, rleft_bound_iter1)
+            args.position_gt_rright_bound = min(pred_positions[i,0,0] + next_iter_std_mult_r * Empirical_RMSE_r, rright_bound_iter1)
+            args.position_gt_thetaleft_bound = max(pred_positions[i,0,1]*180/math.pi - next_iter_std_mult_theta * Empirical_RMSE_theta, thetaleft_bound_iter1) # degree 
+            args.position_gt_thetaright_bound = min(pred_positions[i,0,1]*180/math.pi + next_iter_std_mult_theta * Empirical_RMSE_theta, thetaright_bound_iter1) # degree
+        else:
+            raise Exception("Invalid dataset_type") 
+        # Generate new dictionary matrix A_dic, and corresponding hypothesis positions (r, theta)   
+        generator_iter2 = DataGenerator(args)
+        A_dic, r_positions_iter2[i], theta_positions_iter2[i] = generator_iter2.dictionary_matrix_rtheta()
+        ### NUV-SSR ###
+        x_pred_iter2[i], EM_steps_iter2[i] = NUV_SSR(args, A_dic, y_mean[i], r_tuning, m)
+        
+    # de-flatten x_pred [sample, m_r*m_theta] -> [sample, m_r, m_theta]
+    x_pred_2D_iter2 = utils.batch_de_flatten(x_pred_iter2, args.m_r, args.m_theta)
+
+    # find peaks [sample, k, 3]
+    peak_indices_iter2 = utils.batch_peak_finding_2D(x_pred_2D_iter2, args.k)
+    end = time.time()
+    t_iter2 = end - start
+    t_iter2_persample = t_iter2 / samples_run
+
+    # convert to positions [sample, k, 2]
+    for i in range(samples_run):
+        # print ('EM steps = {}'.format(EM_steps_iter2[i]))
+        pred_positions_iter2[i] = utils.convert_to_positions(peak_indices_iter2[i], r_positions_iter2[i], theta_positions_iter2[i])
+
+    # convert to xy coordinates
+    pred_positions_xy_iter2 = utils.batch_polar_to_cartesian(pred_positions_iter2)
+    # compute RMSEs
+    squared_diffs_xy_iter2 = utils.batched_permuted_SquareDiff_2D(pred_positions_xy_iter2, gt_positions_xy)
+    RMSE_distance_iter2,Empirical_variance_distance_iter2 = utils.RMSE_distance_error(squared_diffs_xy_iter2)
+    squared_diffs_polar_iter2 = utils.batched_permuted_SquareDiff_2D(pred_positions_iter2, gt_positions)
+    RMSE_r_iter2, RMSE_theta_iter2,Empirical_variance_r_iter2,Empirical_variance_theta_iter2 = utils.RMSE_AxisWise_error(squared_diffs_polar_iter2)
+    RMSE_theta_iter2 = RMSE_theta_iter2 * 180 / math.pi
+    Empirical_variance_theta_iter2 = Empirical_variance_theta_iter2 * 180 / math.pi
+
+    print('Results (iteration2):')
+    print('average EM steps = {}'.format(torch.mean(EM_steps_iter2.float())))
+    print('RMSE r = {} [m]'.format(RMSE_r_iter2))
+    print('empirical variance of r = {} [m]'.format(Empirical_variance_r_iter2))
+    print('RMSE theta = {} [deg]'.format(RMSE_theta_iter2))
+    print('empirical variance of theta = {} [deg]'.format(Empirical_variance_theta_iter2))
+    print('RMSE distance = {} [m]'.format(RMSE_distance_iter2))
+    print('empirical variance of distance = {} [m]'.format(Empirical_variance_distance_iter2))
+    # Print Run Time
+    print('Run Time/sample= {} [sec]'.format(t_iter2_persample))
+    # Summary print
+    print(RMSE_r_iter2.item(), Empirical_variance_r_iter2.item(), RMSE_theta_iter2.item(), Empirical_variance_theta_iter2.item(), RMSE_distance_iter2.item(), Empirical_variance_distance_iter2.item(),t_iter2_persample,torch.mean(EM_steps_iter2.float()).item())
+    # Save empirical RMSEs of r and theta if "train" dataset
+    if dataset_type == 'train':
+      Empirical_RMSE_r_iter2 = RMSE_r_iter2
+      Empirical_RMSE_theta_iter2 = RMSE_theta_iter2
+
+    ##########################################################################################
+    ### iteration 3 ###
+    # Tuning parameters for iteration 3
+    args.m_r = 11
+    args.m_theta = 91
+    m = args.m_r * args.m_theta # total num of hypotheses
+    next_iter_std_mult_r = 3
+    next_iter_std_mult_theta = 3
+    r_tuning = 100
+    args.convergence_threshold = 1e-2
+
+    print('======================================')
+    # Tuning parameter
+    print('dataset type = {}'.format(dataset_type))
+    print('Tuning parameter (iteration3):')
+    print('r_tuning = {}'.format(r_tuning))
+    print('convergence_threshold = {}'.format(args.convergence_threshold))
+    # Dataset
+    print('new search area: pred R +/- {} * RMSE_R'.format(next_iter_std_mult_r))
+    print('new search area: pred theta +/- {} * RMSE_theta'.format(next_iter_std_mult_theta))
+    print('# sample points of r = {}'.format(args.m_r))
+    print('# sample points of theta = {}'.format(args.m_theta))
+
+    # Initialization
+    r_positions_iter3 = torch.zeros(samples_run, args.m_r, dtype=torch.float, device=device)
+    theta_positions_iter3 = torch.zeros(samples_run, args.m_theta, dtype=torch.float, device=device)
+    x_pred_iter3 = torch.zeros(samples_run, m, dtype=torch.cfloat, device=device)
+    EM_steps_iter3 = torch.zeros(samples_run, dtype=torch.int, device=device)
+    pred_positions_iter3 = torch.zeros(samples_run, args.k, 2, dtype=torch.float, device=device)
+
+    start = time.time()
+    for i in range(samples_run):
+        ### New dictionaries ###
+        # New search area
+        if dataset_type == 'train':
+            args.position_gt_rleft_bound = max(pred_positions_iter2[i, 0, 0] - next_iter_std_mult_r * RMSE_r_iter2, rleft_bound_iter1)
+            args.position_gt_rright_bound = min(pred_positions_iter2[i,0,0] + next_iter_std_mult_r * RMSE_r_iter2, rright_bound_iter1)
+            args.position_gt_thetaleft_bound = max(pred_positions_iter2[i,0,1]*180/math.pi - next_iter_std_mult_theta * RMSE_theta_iter2, thetaleft_bound_iter1) # degree
+            args.position_gt_thetaright_bound = min(pred_positions_iter2[i,0,1]*180/math.pi + next_iter_std_mult_theta * RMSE_theta_iter2, thetaright_bound_iter1) # degree  
+        elif dataset_type == 'test': # use empirical RMSEs of r and theta
+            args.position_gt_rleft_bound = max(pred_positions_iter2[i, 0, 0] - next_iter_std_mult_r * Empirical_RMSE_r_iter2, rleft_bound_iter1)
+            args.position_gt_rright_bound = min(pred_positions_iter2[i,0,0] + next_iter_std_mult_r * Empirical_RMSE_r_iter2, rright_bound_iter1)
+            args.position_gt_thetaleft_bound = max(pred_positions_iter2[i,0,1]*180/math.pi - next_iter_std_mult_theta * Empirical_RMSE_theta_iter2, thetaleft_bound_iter1) # degree
+            args.position_gt_thetaright_bound = min(pred_positions_iter2[i,0,1]*180/math.pi + next_iter_std_mult_theta * Empirical_RMSE_theta_iter2, thetaright_bound_iter1) # degree
+        # Generate new dictionary matrix A_dic, and corresponding hypothesis positions (r, theta)   
+        generator_iter3 = DataGenerator(args)
+        A_dic, r_positions_iter3[i], theta_positions_iter3[i] = generator_iter3.dictionary_matrix_rtheta()
+        ### NUV-SSR ###
+        x_pred_iter3[i], EM_steps_iter3[i] = NUV_SSR(args, A_dic, y_mean[i], r_tuning, m)
+        
+    # de-flatten x_pred [sample, m_r*m_theta] -> [sample, m_r, m_theta]
+    x_pred_2D_iter3 = utils.batch_de_flatten(x_pred_iter3, args.m_r, args.m_theta)
+
+    # find peaks [sample, k, 3]
+    peak_indices_iter3 = utils.batch_peak_finding_2D(x_pred_2D_iter3, args.k)
+    end = time.time()
+    t_iter3 = end - start
+    t_iter3_persample = t_iter3 / samples_run
+
+    # convert to positions [sample, k, 2]
+    for i in range(samples_run):
+        # print ('EM steps = {}'.format(EM_steps_iter3[i]))
+        pred_positions_iter3[i] = utils.convert_to_positions(peak_indices_iter3[i], r_positions_iter3[i], theta_positions_iter3[i])
+
+    # convert to xy coordinates
+    pred_positions_xy_iter3 = utils.batch_polar_to_cartesian(pred_positions_iter3)
+    # compute RMSEs
+    squared_diffs_xy_iter3 = utils.batched_permuted_SquareDiff_2D(pred_positions_xy_iter3, gt_positions_xy)
+    RMSE_distance_iter3,Empirical_variance_distance_iter3 = utils.RMSE_distance_error(squared_diffs_xy_iter3)
+    squared_diffs_polar_iter3 = utils.batched_permuted_SquareDiff_2D(pred_positions_iter3, gt_positions)
+    RMSE_r_iter3, RMSE_theta_iter3,Empirical_variance_r_iter3,Empirical_variance_theta_iter3 = utils.RMSE_AxisWise_error(squared_diffs_polar_iter3)
+    RMSE_theta_iter3 = RMSE_theta_iter3 * 180 / math.pi
+    Empirical_variance_theta_iter3 = Empirical_variance_theta_iter3 * 180 / math.pi
+
+    print('Results (iteration3):')
+    print('average EM steps = {}'.format(torch.mean(EM_steps_iter3.float())))
+    print('RMSE r = {} [m]'.format(RMSE_r_iter3))
+    print('empirical variance of r = {} [m]'.format(Empirical_variance_r_iter3))
+    print('RMSE theta = {} [deg]'.format(RMSE_theta_iter3))
+    print('empirical variance of theta = {} [deg]'.format(Empirical_variance_theta_iter3))
+    print('RMSE distance = {} [m]'.format(RMSE_distance_iter3))
+    print('empirical variance of distance = {} [m]'.format(Empirical_variance_distance_iter3))
+    # Print Run Time
+    print('Run Time/sample= {} [sec]'.format(t_iter3_persample))
+    # Summary print
+    print(RMSE_r_iter3.item(), Empirical_variance_r_iter3.item(), RMSE_theta_iter3.item(), Empirical_variance_theta_iter3.item(), RMSE_distance_iter3.item(), Empirical_variance_distance_iter3.item(),t_iter3_persample,torch.mean(EM_steps_iter3.float()).item())
     
-# de-flatten x_pred [sample, m_r*m_theta] -> [sample, m_r, m_theta]
-x_pred_2D = utils.batch_de_flatten(x_pred, args.m_r, args.m_theta)
-
-# find peaks [sample, k, 3]
-peak_indices = utils.batch_peak_finding_2D(x_pred_2D, args.k)
-end = time.time()
-t_iter1 = end - start
-t_iter1_persample = t_iter1 / samples_run
-
-for i in range(samples_run):
-    print ('EM steps = {}'.format(EM_steps[i]))
-
-# convert to positions [sample, k, 2]
-pred_positions = utils.batch_convert_to_positions(peak_indices, r_positions, theta_positions)
-
-# convert to xy coordinates
-pred_positions_xy = utils.batch_polar_to_cartesian(pred_positions)
-gt_positions_xy = utils.batch_polar_to_cartesian(gt_positions)
-
-# compute RMSEs
-squared_diffs_xy = utils.batched_permuted_SquareDiff_2D(pred_positions_xy, gt_positions_xy) 
-RMSE_distance, Empirical_variance_distance = utils.RMSE_distance_error(squared_diffs_xy)
-squared_diffs_polar = utils.batched_permuted_SquareDiff_2D(pred_positions, gt_positions)
-RMSE_r, RMSE_theta,Empirical_variance_r,Empirical_variance_theta = utils.RMSE_AxisWise_error(squared_diffs_polar)
-RMSE_theta = RMSE_theta * 180 / math.pi
-Empirical_variance_theta = Empirical_variance_theta * 180 / math.pi
-
-print('Results (iteration1):')
-print('average EM steps = {}'.format(torch.mean(EM_steps.float())))
-print('RMSE r = {} [m]'.format(RMSE_r))
-print('empirical variance of r = {} [m]'.format(Empirical_variance_r))
-print('RMSE theta = {} [deg]'.format(RMSE_theta))
-print('empirical variance of theta = {} [deg]'.format(Empirical_variance_theta))
-print('RMSE distance = {} [m]'.format(RMSE_distance))
-print('empirical variance of distance = {} [m]'.format(Empirical_variance_distance))
-# Print Run Time
-print('Run Time/sample= {} [sec]'.format(t_iter1_persample))
-if args.coherent_source:
-    SNR = 10*math.log10((args.mean_c) / args.r2)
-else:
-    SNR = 10*math.log10((args.x_var) / args.r2)
-print('SNR = {} [dB]'.format(SNR))
-
-
-##########################################################################################
-### iteration 2 ###
-args.m_r = 11
-args.m_theta = 91
-m = args.m_r * args.m_theta # total num of hypotheses
-next_iter_std_mult_r = 3
-next_iter_std_mult_theta = 3
-
-# Tuning parameters for iteration 2 (low noise)
-# r_tuning = 1
-# args.convergence_threshold = 1e-5
-# Tuning parameters for iteration 2 (low noise)
-r_tuning = 100
-args.convergence_threshold = 1e-2
-
-print('======================================')
-# Tuning parameter
-print('Tuning parameter (iteration2):')
-print('r_tuning = {}'.format(r_tuning))
-print('convergence_threshold = {}'.format(args.convergence_threshold))
-# Dataset
-print('new search area: pred R +/- {} * RMSE_R'.format(next_iter_std_mult_r))
-print('new search area: pred theta +/- {} * RMSE_theta'.format(next_iter_std_mult_theta))
-print('# sample points of r = {}'.format(args.m_r))
-print('# sample points of theta = {}'.format(args.m_theta))
-
-# Initialization
-r_positions_iter2 = torch.zeros(samples_run, args.m_r, dtype=torch.float, device=device)
-theta_positions_iter2 = torch.zeros(samples_run, args.m_theta, dtype=torch.float, device=device)
-x_pred_iter2 = torch.zeros(samples_run, m, dtype=torch.cfloat, device=device)
-EM_steps_iter2 = torch.zeros(samples_run, dtype=torch.int, device=device)
-pred_positions_iter2 = torch.zeros(samples_run, args.k, 2, dtype=torch.float, device=device)
-rleft_bound_iter1 = args.position_gt_rleft_bound
-rright_bound_iter1 = args.position_gt_rright_bound
-thetaleft_bound_iter1 = args.position_gt_thetaleft_bound
-thetaright_bound_iter1 = args.position_gt_thetaright_bound
-
-start = time.time()
-for i in range(samples_run):
-    ### New dictionaries ###
-    # New search area
-    args.position_gt_rleft_bound = max(pred_positions[i, 0, 0] - next_iter_std_mult_r * RMSE_r, rleft_bound_iter1)
-    args.position_gt_rright_bound = min(pred_positions[i,0,0] + next_iter_std_mult_r * RMSE_r, rright_bound_iter1)
-    args.position_gt_thetaleft_bound = max(pred_positions[i,0,1]*180/math.pi - next_iter_std_mult_theta * RMSE_theta, thetaleft_bound_iter1) # degree
-    args.position_gt_thetaright_bound = min(pred_positions[i,0,1]*180/math.pi + next_iter_std_mult_theta * RMSE_theta, thetaright_bound_iter1) # degree  
-    # Generate new dictionary matrix A_dic, and corresponding hypothesis positions (r, theta)   
-    generator_iter2 = DataGenerator(args)
-    A_dic, r_positions_iter2[i], theta_positions_iter2[i] = generator_iter2.dictionary_matrix_rtheta()
-    ### NUV-SSR ###
-    x_pred_iter2[i], EM_steps_iter2[i] = NUV_SSR(args, A_dic, y_mean[i], r_tuning, m)
-    
-# de-flatten x_pred [sample, m_r*m_theta] -> [sample, m_r, m_theta]
-x_pred_2D_iter2 = utils.batch_de_flatten(x_pred_iter2, args.m_r, args.m_theta)
-
-# find peaks [sample, k, 3]
-peak_indices_iter2 = utils.batch_peak_finding_2D(x_pred_2D_iter2, args.k)
-end = time.time()
-t_iter2 = end - start
-t_iter2_persample = t_iter2 / samples_run
-
-# convert to positions [sample, k, 2]
-for i in range(samples_run):
-    print ('EM steps = {}'.format(EM_steps_iter2[i]))
-    pred_positions_iter2[i] = utils.convert_to_positions(peak_indices_iter2[i], r_positions_iter2[i], theta_positions_iter2[i])
-
-# convert to xy coordinates
-pred_positions_xy_iter2 = utils.batch_polar_to_cartesian(pred_positions_iter2)
-# compute RMSEs
-squared_diffs_xy_iter2 = utils.batched_permuted_SquareDiff_2D(pred_positions_xy_iter2, gt_positions_xy)
-RMSE_distance_iter2,Empirical_variance_distance_iter2 = utils.RMSE_distance_error(squared_diffs_xy_iter2)
-squared_diffs_polar_iter2 = utils.batched_permuted_SquareDiff_2D(pred_positions_iter2, gt_positions)
-RMSE_r_iter2, RMSE_theta_iter2,Empirical_variance_r_iter2,Empirical_variance_theta_iter2 = utils.RMSE_AxisWise_error(squared_diffs_polar_iter2)
-RMSE_theta_iter2 = RMSE_theta_iter2 * 180 / math.pi
-Empirical_variance_theta_iter2 = Empirical_variance_theta_iter2 * 180 / math.pi
-
-print('Results (iteration2):')
-print('average EM steps = {}'.format(torch.mean(EM_steps_iter2.float())))
-print('RMSE r = {} [m]'.format(RMSE_r_iter2))
-print('empirical variance of r = {} [m]'.format(Empirical_variance_r_iter2))
-print('RMSE theta = {} [deg]'.format(RMSE_theta_iter2))
-print('empirical variance of theta = {} [deg]'.format(Empirical_variance_theta_iter2))
-print('RMSE distance = {} [m]'.format(RMSE_distance_iter2))
-print('empirical variance of distance = {} [m]'.format(Empirical_variance_distance_iter2))
-# Print Run Time
-print('Run Time/sample= {} [sec]'.format(t_iter2_persample))
-
 #######################
 ### Save for MATLAB ###
 #######################
